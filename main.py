@@ -5,7 +5,7 @@ from threading import Thread
 from flask import Flask
 
 # =========================
-# WEB SERVER (Keep Alive)
+# WEB SERVER
 # =========================
 server = Flask(__name__)
 
@@ -28,7 +28,7 @@ bot = telebot.TeleBot(BOT_TOKEN, threaded=True)
 
 
 # =========================
-# TYPE CONFIG
+# TYPE MAP (UNCHANGED)
 # =========================
 type_map = {
     "Mega": {"aliases": ["mega", "မီ"], "discount": 0.07},
@@ -38,17 +38,22 @@ type_map = {
 
 
 # =========================
-# NORMALIZE INPUT
+# NORMALIZE (UPGRADED)
 # =========================
 def normalize(text):
     text = text.lower()
-    text = text.replace("=", "\n")   # critical fix
+
+    # split all separators safely
+    text = text.replace("=", "\n")
+    text = text.replace("/", " ")
+    text = text.replace(".", " ")
+
     text = re.sub(r'\s+', ' ', text)
     return text
 
 
 # =========================
-# TYPE DETECT
+# TYPE DETECT (UNCHANGED SAFE)
 # =========================
 def detect_type(text):
     for name, cfg in type_map.items():
@@ -59,50 +64,57 @@ def detect_type(text):
 
 
 # =========================
-# CORE PARSER (SAFE ENGINE)
+# CORE PARSER (UPGRADED ONLY)
 # =========================
 def parse_blocks(text):
 
     total_money = 0
     total_count = 0
+    bonus = 0
 
     lines = [l.strip() for l in text.split("\n") if l.strip()]
 
     for line in lines:
 
-        # skip type line
-        if any(a in line for t in type_map.values() for a in t["aliases"]):
+        # ======================
+        # BONUS (ပူး500)
+        # ======================
+        bonus_match = re.search(r'ပူး(\d+)', line)
+        if bonus_match:
+            bonus += int(bonus_match.group(1))
             continue
 
-        # =========================
-        # R FORMAT BLOCK
-        # =========================
+        # ======================
+        # R FORMAT
+        # ======================
         match = re.search(r'(\d+)r(\d+)', line)
 
         if match:
 
-            normal_price = int(match.group(1))
-            r_price = int(match.group(2))
+            normal = int(match.group(1))
+            rprice = int(match.group(2))
 
-            # remove R part before number counting
+            # remove R part before counting
             clean = re.sub(r'\d+r\d+', '', line)
 
             nums = re.findall(r'\d+', clean)
             count = len(nums)
 
-            total_money += count * (normal_price + r_price)
+            total_money += count * (normal + rprice)
             total_count += count * 2
 
             continue
 
-        # ignore other garbage lines safely
+        # ======================
+        # IGNORE OTHER LINES SAFELY
+        # ======================
         continue
 
-    return total_money, total_count
+    return total_money, total_count, bonus
 
 
 # =========================
-# START COMMAND
+# START
 # =========================
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -124,23 +136,24 @@ def handler(message):
         bot.reply_to(message, f"📢 {ADMIN_USERNAME}\nType မတွေ့ပါ")
         return
 
-    total_money, total_count = parse_blocks(text)
+    total, count, bonus = parse_blocks(text)
 
-    cashback = int(total_money * discount)
-    final = total_money - cashback
+    cashback = int(total * discount)
+    final = total - cashback + bonus
 
     result = (
         f"👤 {user}\n\n"
-        f"📊 {type_name} Total = {total_money:,} ကျပ်\n\n"
+        f"📊 {type_name} Total = {total:,} ကျပ်\n"
+        f"➕ Bonus = {bonus:,} ကျပ်\n\n"
         f"🎁 Cashback = {cashback:,} ကျပ်\n\n"
-        f"💵 Final = {final:,} ကျပ်ဘဲလွဲပါရှင့်"
+        f"💵 Final = {final:,} ကျပ်"
     )
 
     bot.reply_to(message, result)
 
 
 # =========================
-# RUN BOT
+# RUN
 # =========================
 if __name__ == "__main__":
     Thread(target=run_web).start()
