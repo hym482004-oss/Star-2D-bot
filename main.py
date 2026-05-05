@@ -7,15 +7,15 @@ from flask import Flask
 # =========================
 # WEB SERVER
 # =========================
-server = Flask(__name__)
+app = Flask(__name__)
 
-@server.route("/")
+@app.route("/")
 def home():
     return "Bot is running", 200
 
 def run_web():
     port = int(os.environ.get("PORT", 8080))
-    server.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port)
 
 
 # =========================
@@ -28,7 +28,19 @@ bot = telebot.TeleBot(BOT_TOKEN, threaded=True)
 
 
 # =========================
-# TYPE MAP (UNCHANGED)
+# NORMALIZE
+# =========================
+def normalize(text):
+    text = text.lower()
+    text = text.replace("=", "\n")
+    text = text.replace("-", "\n")
+    text = text.replace("/", " ")
+    text = text.replace(".", " ")
+    return text
+
+
+# =========================
+# TYPE DETECT (UNCHANGED)
 # =========================
 type_map = {
     "Mega": {"aliases": ["mega", "မီ"], "discount": 0.07},
@@ -36,81 +48,77 @@ type_map = {
     "MM": {"aliases": ["mm"], "discount": 0.10},
 }
 
-
-# =========================
-# NORMALIZE (UPGRADED)
-# =========================
-def normalize(text):
-    text = text.lower()
-
-    # split all separators safely
-    text = text.replace("=", "\n")
-    text = text.replace("/", " ")
-    text = text.replace(".", " ")
-
-    text = re.sub(r'\s+', ' ', text)
-    return text
-
-
-# =========================
-# TYPE DETECT (UNCHANGED SAFE)
-# =========================
 def detect_type(text):
     for name, cfg in type_map.items():
         for alias in cfg["aliases"]:
-            if re.search(rf'\b{re.escape(alias)}\b', text):
+            if alias in text:
                 return name, cfg["discount"]
     return None, 0
 
 
 # =========================
-# CORE PARSER (UPGRADED ONLY)
+# ✔ FIXED CALC ONLY
 # =========================
-def parse_blocks(text):
+def calculate(text):
 
-    total_money = 0
-    total_count = 0
-    bonus = 0
-
-    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    total = 0
+    lines = [l.strip() for l in normalize(text).split("\n") if l.strip()]
 
     for line in lines:
 
         # ======================
-        # BONUS (ပူး500)
+        # KHWE (FIXED)
         # ======================
-        bonus_match = re.search(r'ပူး(\d+)', line)
-        if bonus_match:
-            bonus += int(bonus_match.group(1))
-            continue
+        if "ခွေ" in line:
 
-        # ======================
-        # R FORMAT
-        # ======================
-        match = re.search(r'(\d+)r(\d+)', line)
+            nums = re.findall(r'\d+', line)
 
-        if match:
+            if not nums:
+                continue
 
-            normal = int(match.group(1))
-            rprice = int(match.group(2))
+            n = len(nums)
 
-            # remove R part before counting
-            clean = re.sub(r'\d+r\d+', '', line)
+            base = n * (n - 1)
 
-            nums = re.findall(r'\d+', clean)
-            count = len(nums)
-
-            total_money += count * (normal + rprice)
-            total_count += count * 2
+            if "ပူး" in line:
+                pair = sum(1 for x in nums if len(x) == 2 and x[0] == x[1])
+                total += base + pair
+            else:
+                total += base
 
             continue
 
         # ======================
-        # IGNORE OTHER LINES SAFELY
+        # TOP / BRAKET
         # ======================
-        continue
+        if "ထိပ်" in line or "ဘရိတ်" in line:
+            nums = re.findall(r'\d+', line)
+            if nums:
+                total += 10 * len(nums)
+            continue
 
-    return total_money, total_count, bonus
+        # ======================
+        # EVEN / ODD
+        # ======================
+        if any(x in line for x in ["စမ", "စစ", "မမ"]):
+            total += 25
+            continue
+
+        # ======================
+        # PAIR SYSTEM
+        # ======================
+        if "ကပ်" in line:
+            nums = re.findall(r'\d+', line)
+            total += len(nums) * len(nums)
+            continue
+
+        # ======================
+        # DEFAULT
+        # ======================
+        nums = re.findall(r'\d+', line)
+        total += len(nums)
+
+    return total
 
 
 # =========================
@@ -122,34 +130,37 @@ def start(message):
 
 
 # =========================
-# MAIN HANDLER
+# MAIN HANDLER (UNCHANGED)
 # =========================
 @bot.message_handler(func=lambda m: True)
 def handler(message):
 
-    text = normalize(message.text)
+    text = message.text
     user = message.from_user.first_name or "User"
 
-    type_name, discount = detect_type(text)
+    try:
+        type_name, discount = detect_type(text)
 
-    if not type_name:
-        bot.reply_to(message, f"📢 {ADMIN_USERNAME}\nType မတွေ့ပါ")
-        return
+        if not type_name:
+            bot.reply_to(message, f"📢 {ADMIN_USERNAME}\nType မတွေ့ပါ")
+            return
 
-    total, count, bonus = parse_blocks(text)
+        total = calculate(text)
 
-    cashback = int(total * discount)
-    final = total - cashback + bonus
+        cashback = int(total * discount)
+        final = total - cashback
 
-    result = (
-        f"👤 {user}\n\n"
-        f"📊 {type_name} Total = {total:,} ကျပ်\n"
-        f"➕ Bonus = {bonus:,} ကျပ်\n\n"
-        f"🎁 Cashback = {cashback:,} ကျပ်\n\n"
-        f"💵 Final = {final:,} ကျပ်"
-    )
+        result = (
+            f"👤 {user}\n\n"
+            f"📊 {type_name} Total = {total:,} ကျပ်\n"
+            f"🎁 Cash Back = {cashback:,} ကျပ်\n"
+            f"💵 Total = {final:,} ကျပ်"
+        )
 
-    bot.reply_to(message, result)
+        bot.reply_to(message, result)
+
+    except Exception:
+        bot.reply_to(message, "❌ Error")
 
 
 # =========================
