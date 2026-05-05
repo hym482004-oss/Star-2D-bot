@@ -51,7 +51,8 @@ def calculate_count(line):
     # --- Khwe Rule ---
     if "ခွေ" in line:
         n = len(nums[0])
-        if "ပူး" in line:
+        # Check both "ပူး" and "ပူး"
+        if "ပူး" in line or "ပူး" in line:
             return (n * (n - 1)) + n, is_reverse
         else:
             return n * (n - 1), is_reverse
@@ -110,14 +111,11 @@ def handle(message):
             return
 
         # 🛑 RULE:
-        # 1. ဂဏန်း အနည်းဆုံး 2 လုံးတွဲ (xx) ပါရမည်
-        # 2. ဒါမှမဟုတ် စာရင်းစစ်စကားလုံး ပါရမည်
-        # ဖုန်းနံပါတ် ရှည်ကြီးတွေကို ကျော်သွားမည်
-        
-        has_number_pair = re.search(r'\d{2}', text)
+        # 1. စာရင်းစစ်စကားလုံး ပါရမည်
+        # 2. ဒါမှမဟုတ် ဂဏန်း 2 လုံးတွဲ (xx) ပါရမည်
         trigger_words = ['ခွေ', 'ပူး', 'ထိပ်', 'bk', 'ဘရိတ်', 'ကပ်', 'ကို', 'စမ', 'စစ', 'မမ', 'pw', 'ပါဝါ', 'nk', 'နက္ခတ်', 'အပူး', 'ph', 'r', 'အာ']
         
-        if not has_number_pair and not any(word in lower_text for word in trigger_words):
+        if not any(word in lower_text for word in trigger_words) and not re.search(r'\d{2}', text):
             return
 
         # --- Company Check & Percentage ---
@@ -135,7 +133,7 @@ def handle(message):
         elif any(k in lower_text for k in ['laos', 'လာအို', 'la']):
             percent = 7
             comp_name = "Laos"
-        elif any(k in lower_text for k in ['ld', 'london', 'လန်ဒန်']):
+        elif any(k in lower_text for k in ['ld', 'london', 'လန်ဒန်', 'လန်လန်']):
             percent = 7
             comp_name = "LD"
         else:
