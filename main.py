@@ -133,7 +133,7 @@ def handler(message):
         f"👤 {user}\n\n"
         f"📊 {type_name} Total = {total_money:,} ကျပ်\n\n"
         f"🎁 Cashback = {cashback:,} ကျပ်\n\n"
-        f"💵 Final = {final:,} ကျပ်"
+        f"💵 Final = {final:,} ကျပ်ဘဲလွဲပါရှင့်"
     )
 
     bot.reply_to(message, result)
