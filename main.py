@@ -21,7 +21,7 @@ def run_web():
 # =========================
 # BOT CONFIG
 # =========================
-BOT_TOKEN = "8663479446:AAEHOXsSBCxpwh7fK3AbtEbbIAouBMFM9R4"
+BOT_TOKEN = "YOUR_BOT_TOKEN"
 bot = telebot.TeleBot(BOT_TOKEN, threaded=True)
 
 
@@ -50,29 +50,27 @@ def calculate_count(line):
 
     # --- Khwe Rule ---
     if "ခွေ" in line:
-        n = len(nums[0]) # Take first number length
+        n = len(nums[0])
         if "ပူး" in line:
-            # ခွေပူး = n*(n-1) + n
             return (n * (n - 1)) + n, is_reverse
         else:
-            # ခွေ = n*(n-1)
             return n * (n - 1), is_reverse
 
     # --- Break Rule (bk / ဘရိတ်) ---
     if "bk" in line or "ဘရိတ်" in line:
-        # Any number bk = 10 ကွက်
-        return 10, is_reverse
+        bk_digits = re.findall(r'(\d+)bk', line)
+        return len(bk_digits) * 10, is_reverse
 
     # --- Top Rule (ထိပ်) ---
     if "ထိပ်" in line or "ထ" in line:
         return 10, is_reverse
 
-    # --- Power / Nk / နက္ခတ် / အပူး ---
-    if any(x in line for x in ['pw', 'ပါဝါ', 'nk', 'နက္ခတ်', 'အပူး']):
+    # --- Power / Nk / နက္ခတ် / အပူး / PH ---
+    if any(x in line for x in ['pw', 'ပါဝါ', 'nk', 'နက္ခတ်', 'အပူး', 'ph']):
         return 10, is_reverse
 
     # --- Special Pattern ---
-    if any(x in line for x in ["စမ", "စစ်", "မမ", "စုံစုံ", "စုံမ", "မစ်"]):
+    if any(x in line for x in ["စမ", "စစ", "မမ", "စုံစုံ", "စုံမ", "မစ်"]):
         return 25, is_reverse
 
     # --- Kap Rule (ကပ် / ကို) ---
@@ -105,29 +103,39 @@ def handle(message):
     user = message.from_user.first_name or "User"
 
     try:
-        text = message.text.lower()
-        original_text = message.text
+        text = message.text
+        lower_text = text.lower()
 
         if not text:
-            bot.reply_to(message, "❌ စာမရှိပါ")
+            return
+
+        # 🛑 RULE:
+        # 1. ဂဏန်း အနည်းဆုံး 2 လုံးတွဲ (xx) ပါရမည်
+        # 2. ဒါမှမဟုတ် စာရင်းစစ်စကားလုံး ပါရမည်
+        # ဖုန်းနံပါတ် ရှည်ကြီးတွေကို ကျော်သွားမည်
+        
+        has_number_pair = re.search(r'\d{2}', text)
+        trigger_words = ['ခွေ', 'ပူး', 'ထိပ်', 'bk', 'ဘရိတ်', 'ကပ်', 'ကို', 'စမ', 'စစ', 'မမ', 'pw', 'ပါဝါ', 'nk', 'နက္ခတ်', 'အပူး', 'ph', 'r', 'အာ']
+        
+        if not has_number_pair and not any(word in lower_text for word in trigger_words):
             return
 
         # --- Company Check & Percentage ---
         percent = 0
         comp_name = ""
-        if any(k in text for k in ['du', 'ဒု', 'ဒူ', 'dubai']):
+        if any(k in lower_text for k in ['du', 'ဒု', 'ဒူ', 'dubai']):
             percent = 7
             comp_name = "Du"
-        elif any(k in text for k in ['me', 'mega', 'မီ']):
+        elif any(k in lower_text for k in ['me', 'mega', 'မီ']):
             percent = 7
             comp_name = "Me"
-        elif any(k in text for k in ['mm']):
+        elif any(k in lower_text for k in ['mm']):
             percent = 10
             comp_name = "MM"
-        elif any(k in text for k in ['laos', 'လာအို', 'la']):
+        elif any(k in lower_text for k in ['laos', 'လာအို', 'la']):
             percent = 7
             comp_name = "Laos"
-        elif any(k in text for k in ['ld', 'london', 'လန်ဒန်']):
+        elif any(k in lower_text for k in ['ld', 'london', 'လန်ဒန်']):
             percent = 7
             comp_name = "LD"
         else:
@@ -135,23 +143,28 @@ def handle(message):
             comp_name = "Company"
 
         # --- Price Extraction ---
-        # Find X R Y pattern
-        price_match = re.search(r'(\d+)\s*r\s*(\d+)', text)
+        # Pattern: X R Y
+        price_match = re.search(r'(\d+)\s*r\s*(\d+)', lower_text)
+        # Pattern: X-Y or X=Y
+        price_match2 = re.search(r'(\d+)\s*[-=]\s*(\d+)', lower_text)
+        # Pattern: only price at end
+        price_simple = re.search(r'(\d+)\s*$', lower_text)
+
         if price_match:
             price_norm = int(price_match.group(1))
             price_rev = int(price_match.group(2))
+        elif price_match2:
+            price_norm = int(price_match2.group(1))
+            price_rev = int(price_match2.group(2))
+        elif price_simple:
+            price_norm = int(price_simple.group(1))
+            price_rev = price_norm
         else:
-            # Find simple price at end
-            price_simple = re.search(r'(\d+)\s*$', text)
-            if price_simple:
-                price_norm = int(price_simple.group(1))
-                price_rev = price_norm
-            else:
-                price_norm = 0
-                price_rev = 0
+            price_norm = 0
+            price_rev = 0
 
         # --- Split Lines ---
-        lines = [l.strip() for l in normalize(original_text).split("\n") if l.strip()]
+        lines = [l.strip() for l in normalize(text).split("\n") if l.strip()]
 
         total_amount = 0
 
@@ -162,9 +175,6 @@ def handle(message):
                 continue
 
             if is_reverse_mode:
-                # R ပါရင်: ပုံမှန်ကွက် + ပြောင်းပြန်ကွက်
-                # ပုံမှန်ဈေးနဲ့ ပြောင်းပြန်ဈေး မတူရင် သီးခြားတွက်
-                # User logic: All original * price_norm + All reversed * price_rev
                 total_amount += (count * price_norm) + (count * price_rev)
             else:
                 total_amount += count * price_norm
@@ -185,7 +195,7 @@ def handle(message):
 
     except Exception as e:
         print(f"Error: {e}")
-        bot.reply_to(message, "❌ Error ဖြစ်နေပါသည်")
+        pass
 
 
 # =========================
