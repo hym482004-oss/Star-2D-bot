@@ -1,169 +1,287 @@
 import telebot
 import re
 import itertools
-import os
-from threading import Thread
-from flask import Flask
+import sqlite3
+from datetime import datetime
 
-# ==============================================
-# 🔴 ၁။ Web Server (Render Free Tier အတွက်)
-# ==============================================
-server = Flask(__name__)
-@server.route("/")
-def webhook(): return "Bot is running", 200
+BOT_TOKEN =8663479446:AAEHOXsSBCxpwh7fK3AbtEbbIAouBMFM9R4
+OWNER_ID = 6023513934
 
-def run_web():
-    port = int(os.environ.get("PORT", 8080))
-    server.run(host="0.0.0.0", port=port)
+bot = telebot.TeleBot(BOT_TOKEN)
 
-# ==============================================
-# 🔴 ၂။ Bot Configuration
-# ==============================================
-BOT_TOKEN = '8663479446:AAEHOXsSBCxpwh7fK3AbtEbbIAouBMFM9R4'
-bot = telebot.TeleBot(BOT_TOKEN, threaded=True)
+conn = sqlite3.connect('bot_control.db', check_same_thread=False)
+c = conn.cursor()
 
-# ==============================================
-# 🛠️ ၃။ Mention Function (Admin Tag ခေါ်ရန်)
-# ==============================================
-def get_admin_mentions(chat_id):
-    try:
-        admins = bot.get_chat_administrators(chat_id)
-        mentions = ""
-        for a in admins:
-            if a.user.username: 
-                mentions += f"@{a.user.username} "
-            else: 
-                mentions += f"[{a.user.first_name}](tg://user?id={a.user.id}) "
-        return mentions
-    except: 
-        return "Admin များ"
+c.execute('''CREATE TABLE IF NOT EXISTS groups_list
+             (id INTEGER PRIMARY KEY AUTOINCREMENT,
+              group_id INTEGER UNIQUE,
+              status TEXT)''')
+conn.commit()
 
-# ==============================================
-# 🛠️ ၄။ လူကြီးမင်း၏ တွက်နည်း Logic များ
-# ==============================================
-def get_numbers(text):
-    text = text.lower().replace(' ', '')
-    price_match = re.search(r'(\d+)$', text)
-    if not price_match: return [], 0
-    price = int(price_match.group(1))
-    
-    main_match = re.search(r'^(\d+)', text)
-    main_num = main_match.group(1) if main_match else ""
-    
-    res = []
-    is_reverse = 'r' in text or 'အာ' in text
+def is_owner(user_id):
+    return user_id == OWNER_ID
 
-    # ၁။ ပတ်သီး (၁၉ သို့မဟုတ် ၂၀ ကွက်)
-    if any(x in text for x in ['ပတ်', 'အပါ', 'ပါ']):
-        res = [f"{i:02d}" for i in range(100) if main_num in f"{i:02d}"]
-        if any(x in text for x in ['ပူးပို', '၂၀ကွက်', '20ကွက်']):
-            if main_num + main_num not in res: res.append(main_num + main_num)
-        else:
-            res = list(set(res))
-
-    # ၂။ ထိပ်စီး (၁၀ ကွက်)
-    elif any(x in text for x in ['ထိပ်', 'ထ']):
-        res = [f"{main_num}{i}" for i in range(10)]
-
-    # ၃။ ဘရိတ် (၁၀ သို့မဟုတ် ၅၀ ကွက်)
-    elif 'ဘရိတ်' in text or 'bk' in text:
-        if any(x in text for x in ['စုံဘရိတ်', 'စုံbk']):
-            res = [f"{i:02d}" for i in range(100) if (int(f"{i:02d}"[0]) + int(f"{i:02d}"[1])) % 10 in [0,2,4,6,8]]
-        elif any(x in text for x in ['မဘရိတ်', 'မbk']):
-            res = [f"{i:02d}" for i in range(100) if (int(f"{i:02d}"[0]) + int(f"{i:02d}"[1])) % 10 in [1,3,5,7,9]]
-        else:
-            res = [f"{i:02d}" for i in range(100) if (int(f"{i:02d}"[0]) + int(f"{i:02d}"[1])) % 10 == int(main_num) % 10]
-
-    # ၄။ ခွေဂဏန်း
-    elif 'ခွေ' in text:
-        digits = list(main_num)
-        res = [a+b for a, b in itertools.permutations(digits, 2)]
-        if not is_reverse:
-            res = [a+b for a, b in itertools.combinations(digits, 2)]
-            is_reverse = True
-
-    # ၅။ အပူးပါခွေ / အပူးစုံ
-    elif any(x in text for x in ['ပူး', 'အပူးပါ']):
-        if main_num == "":
-            res = [f"{i}{i}" for i in range(10)]
-        else:
-            digits = list(main_num)
-            res = [a+b for a, b in itertools.combinations(digits, 2)]
-            res.extend([d+d for d in digits])
-            is_reverse = True
-
-    # ၆။ စုံစုံ/မမ/စမ/မစ (၂၅ ကွက်)
-    elif any(x in text for x in ['စစ','မမ','စမ','မစ','စုံစုံ','စုံမ','မစုံ']):
-        e, o = ['0','2','4','6','8'], ['1','3','5','7','9']
-        p1 = e if text.startswith('စ') or text.startswith('စုံ') else o
-        p2 = e if ('စုံ' in text[1:] or 'စ' in text[1:]) else o
-        res = [a+b for a in p1 for b in p2]
-
-    # ၇။ ကပ်/ကို (n * n)
-    elif 'ကို' in text or 'ကပ်' in text:
-        parts = re.split(r'ကို|ကပ်', text)
-        n1 = re.findall(r'\d+', parts[0])[0]
-        n2 = re.findall(r'\d+', parts[1])[0]
-        res = [a+b for a in list(n1) for b in list(n2)]
-
-    # ၈။ ဆယ်ပြည့်
-    elif 'ဆယ်ပြည့်' in text:
-        res = [f"{i}0" for i in range(10)]
-
-    # ၉။ ဒဲ့
-    else:
-        res = [main_num]
-
-    if is_reverse:
-        rev = [n[::-1] for n in res if len(n) == 2 and n[0] != n[1]]
-        res = list(set(res + rev))
-        
-    return res, price
-
-# ==============================================
-# 🤖 ၅။ Bot Handlers
-# ==============================================
 @bot.message_handler(commands=['start'])
-def welcome(message):
-    bot.reply_to(message, "✅ **Star 2D Bot စတင်ပါပြီ**\n\nတွက်နည်းအသစ်များနှင့် Admin Tag ခေါ်ဆိုမှုစနစ် ပါဝင်ပါသည်။", parse_mode="Markdown")
+def add_group(message):
+    if not is_owner(message.from_user.id):
+        bot.reply_to(message, "⚠️ Owner တစ်ယောက်တည်းသာ သုံးလို့ရပါတယ်!")
+        return
+    
+    if 't.me/' in message.text or '+' in message.text:
+        bot.reply_to(message, "✅ **Ok Start...**\nGroup ကို အောင်မြင်စွာ ဖွင့်ပေးလိုက်ပါပြီ!\n⚠️ Group ထဲကို Bot ကို Add ထည့်ပေးပါ။", parse_mode="Markdown")
+    else:
+        bot.reply_to(message, "⚠️ ပုံစံမှားနေပါတယ်!\n/start t.me/xxxxxx\nဒီလိုမျိုး Link တွဲပြီးပို့ပါ။")
+
+@bot.message_handler(commands=['close'])
+def remove_group(message):
+    if not is_owner(message.from_user.id):
+        bot.reply_to(message, "⚠️ Owner တစ်ယောက်တည်းသာ သုံးလို့ရပါတယ်!")
+        return
+    
+    bot.reply_to(message, "✅ **Ok Close...**\nGroup ကို အောင်မြင်စွာ ပိတ်ပေးလိုက်ပါပြီ!", parse_mode="Markdown")
+
+def is_group_active(chat_id):
+    c.execute("SELECT status FROM groups_list WHERE group_id=?", (chat_id,))
+    result = c.fetchone()
+    return result and result[0] == 'active'
 
 @bot.message_handler(func=lambda m: True)
-def calculate(message):
-    text = message.text.lower()
-    
-    # အမျိုးအစားသတ်မှတ်ချက်
-    type_name = ""
-    discount_rate = 0.07 # Default 7%
-
-    if any(x in text for x in ['ဒူ', 'du']): type_name = "Du"
-    elif any(x in text for x in ['မီ', 'mega']): type_name = "Mega"
-    elif any(x in text for x in ['စီ', 'maxi']): type_name = "Maxi"
-    elif any(x in text for x in ['လာ', 'lao']): type_name = "Lao"
-    elif any(x in text for x in ['ကလို', 'glo']): type_name = "Glo"; discount_rate = 0.03
-    elif any(x in text for x in ['လန်', 'ld']): type_name = "Ld"
-
-    # အမျိုးအစားမပါရင် Admin ကို Tag ခေါ်မယ်
-    if type_name == "":
-        if re.search(r'\d+', text):
-            mentions = get_admin_mentions(message.chat.id)
-            bot.reply_to(message, f"⚠️ **အမျိုးအစား မပါဝင်ပါ!**\n{mentions}\nလာစစ်ပေးပါဦး။", parse_mode="Markdown")
+def calculate_all(message):
+    if not is_group_active(message.chat.id):
         return
 
-    nums, price = get_numbers(text)
-    if not nums or price == 0: return
-
-    total_amt = len(nums) * price
-    cash_back = total_amt * discount_rate
-    final_amt = total_amt - cash_back
+    text = message.text.strip()
+    lower_text = text.lower()
     
-    res_text = (f"✅ {type_name} အတွက် တွက်ချက်မှု\n"
-                f"🔢 အကွက်အရေအတွက်: {len(nums)} ကွက်\n"
-                f"💰 စုစုပေါင်း: {int(total_amt):,} ကျပ်\n"
-                f"🎁 Cash Back ({int(discount_rate*100)}%): {int(cash_back):,} ကျပ်\n"
-                f"💵 လွှဲရမည့်ငွေ: {int(final_amt):,} ကျပ်")
+    used_percent = 0
+    percent_num = 0
+    type_text = ""
+    valid = True
     
-    bot.reply_to(message, res_text)
+    if any(k in lower_text for k in ['du2d', 'du', 'ဒု', 'ဒူ', 'ဒူဘိုင်း', 'ငဒူ', 'dubai']):
+        used_percent = 0.07
+        percent_num = 7
+        type_text = "Du"
+    elif any(k in lower_text for k in ['mega', 'မီ', 'me']):
+        used_percent = 0.07
+        percent_num = 7
+        type_text = "Mega"
+    elif any(k in lower_text for k in ['mm']):
+        used_percent = 0.10
+        percent_num = 10
+        type_text = "mm"
+    elif any(k in lower_text for k in ['maxi', 'မက်ဆီ', 'မက်စီ', 'စီစီ']):
+        used_percent = 0.07
+        percent_num = 7
+        type_text = "Maxi"
+    elif any(k in lower_text for k in ['လာအို', 'lao', 'loa', 'laos', 'loas', 'လာလာ', 'la']):
+        used_percent = 0.07
+        percent_num = 7
+        type_text = "လာအို"
+    elif any(k in lower_text for k in ['glo', 'ကလို', 'ဂလို', 'global']):
+        used_percent = 0.03
+        percent_num = 3
+        type_text = "Glo"
+    elif any(k in lower_text for k in ['ld', 'landon', 'london', 'lan', 'လန်ဒန်', 'လန်လန်']):
+        used_percent = 0.07
+        percent_num = 7
+        type_text = "Ld"
+    else:
+        valid = False
 
-if __name__ == "__main__":
-    Thread(target=run_web).start()
-    bot.infinity_polling()
+    if not valid:
+        display = f"⚠️ အမည်မသိ ဖောက်သည် တစ်ယောက် ဝင်လာပြီ!\n"
+        display += f"👑 Owner [ID:{OWNER_ID}]\n"
+        display += "👉 လာစစ်ဆေးပါရှင့်!"
+        bot.reply_to(message, display)
+        return
+
+    price_match = re.search(r'(\d+)\s*$', text)
+    price = int(price_match.group(1)) if price_match else 0
+    
+    numbers_all = re.findall(r'\d+', text)
+    if price_match and numbers_all:
+        numbers_all = numbers_all[:-1]
+    
+    main_num = numbers_all[0] if numbers_all else ""
+    result_list = []
+    is_reverse = False
+
+    if any(k in lower_text for k in ['r', 'အာ']):
+        is_reverse = True
+
+    if any(k in text for k in ['စုံဘရိတ်', 'စုံbk', 'စBk', 'မဘရိတ်', 'မbk', 'မBk']):
+        result_list = get_break_type('စုံဘရိတ်' if 'စုံ' in text else 'မဘရိတ်')
+    elif 'ကပ်' in text or 'ကို' in text:
+        result_list = get_kap(text)
+    elif any(k in text for k in ['စစ်', 'စုံစုံ', 'မမ', 'စမ', 'စုံမ', 'မစ်', 'မစုံ']):
+        if 'စစ်' in text or 'စုံစုံ' in text: p='စစ်'
+        elif 'မမ' in text: p='မမ'
+        elif 'စမ' in text or 'စုံမ' in text: p='စမ'
+        else: p='မစ်'
+        result_list = get_special_pattern(p)
+    elif not main_num:
+        bot.reply_to(message, "⚠️ နံပါတ်ထည့်ပေးပါ ဗျာ!")
+        return
+    else:
+        if any(k in text for k in ['ပတ်ပူးပို', 'ပူးပို', 'ထန်', 'ထပ်', 'ထိပ်ပိတ်', 'ထိပ်နောက်']):
+            result_list = get_round_full(main_num)
+        elif 'ပတ်' in text or 'အပါ' in text or 'ပါ' in text:
+            result_list = get_round(main_num)
+        elif any(k in text for k in ['ထိပ်', 'ထ']):
+            result_list = get_top(main_num)
+        elif 'ဘရိတ်' in text:
+            result_list = get_break_sum(main_num)
+        elif 'ခွေ' in text and 'ပူး' not in text:
+            result_list = get_cycle(main_num)
+        elif 'ပူး' in text or 'အပူးပါ' in text or 'အေခွေပူး' in text or 'ခပ်' in text:
+            result_list = get_double_cycle(main_num)
+        elif 'ဆယ်ပြည့်' in text:
+            result_list = get_ten_full()
+        elif 'အပူးစုံ' in text:
+            result_list = get_all_double()
+        elif 'စုံပူး' in text:
+            result_list = get_even_odd_double(True)
+        elif 'မပူး' in text:
+            result_list = get_even_odd_double(False)
+        elif any(k in lower_text for k in ['r', 'အာ']) and len(main_num) <= 2:
+            result_list = get_reverse(main_num)
+        else:
+            result_list = get_one(main_num)
+
+    if is_reverse and len(result_list) > 0:
+        reversed_list = [n[::-1] for n in result_list if n[0] != n[1]]
+        result_list = list(set(result_list + reversed_list))
+
+    if not result_list:
+        bot.reply_to(message, "⚠️ တွက်လို့မရတဲ့ပုံစံပါဗျာ")
+        return
+
+    count = len(result_list)
+    total_original = count * price
+    discount_amount = total_original * used_percent
+    total_final = total_original - discount_amount
+
+    user_name = message.from_user.first_name if message.from_user.first_name else "User"
+    
+    display = f"👤 {user_name}\n"
+    display += f"{type_text} Total = {int(total_original):,} ကျပ်\n"
+    display += f"{percent_num}% Cash Back = {int(discount_amount):,} ကျပ်\n"
+    display += f"Total = {int(total_final):,} ကျပ်ဘဲ လွဲပေးပါရှင့်"
+
+    bot.reply_to(message, display)
+
+def get_one(num):
+    return [num]
+
+def get_reverse(num):
+    return [num, num[::-1]]
+
+def get_round(num):
+    num = int(num)
+    nums = []
+    for i in range(100):
+        if str(num) in f"{i:02d}":
+            nums.append(f"{i:02d}")
+    return nums
+
+def get_round_full(num):
+    num = int(num)
+    nums = []
+    for i in range(100):
+        if str(num) in f"{i:02d}":
+            nums.append(f"{i:02d}")
+    return nums
+
+def get_top(num):
+    num = int(num)
+    return [f"{num}{i:01d}" for i in range(10)]
+
+def get_break_sum(total):
+    total = int(total)
+    nums = []
+    for i in range(100):
+        s = f"{i:02d}"
+        if int(s[0]) + int(s[1]) == total:
+            nums.append(s)
+    return nums
+
+def get_cycle(num):
+    unique = list(dict.fromkeys(num))
+    if len(unique) < 2:
+        return []
+    cycles = []
+    for a, b in itertools.permutations(unique, 2):
+        cycles.append(a+b)
+    return cycles
+
+def get_double_cycle(num):
+    cycles = get_cycle(num)
+    doubles = [d+d for d in set(num)]
+    cycles.extend(doubles)
+    return list(set(cycles))
+
+def get_ten_full():
+    return [f"{i}0" for i in range(10)]
+
+def get_all_double():
+    return [f"{i}{i}" for i in range(10)]
+
+def get_even_odd_double(is_even):
+    res = []
+    start = 0 if is_even else 1
+    for i in range(start, 10, 2):
+        res.append(f"{i}{i}")
+    return res
+
+def get_special_pattern(p_type):
+    even = ['0','2','4','6','8']
+    odd = ['1','3','5','7','9']
+    res = []
+    if p_type == 'စစ်' or p_type == 'စုံစုံ':
+        for a in even:
+            for b in even:
+                res.append(a+b)
+    elif p_type == 'မမ':
+        for a in odd:
+            for b in odd:
+                res.append(a+b)
+    elif p_type == 'စမ' or p_type == 'စုံမ':
+        for a in even:
+            for b in odd:
+                res.append(a+b)
+    elif p_type == 'မစ်' or p_type == 'မစုံ':
+        for a in odd:
+            for b in even:
+                res.append(a+b)
+    return res
+
+def get_kap(text):
+    parts = re.split(r'ကို|ကပ်', text)
+    nums = [''.join(re.findall(r'\d+', p)) for p in parts if re.search(r'\d+', p)]
+    if len(nums) >= 2:
+        left = list(nums[0])
+        right = list(nums[1])
+        return [a+b for a in left for b in right]
+    return []
+
+def get_break_type(b_type):
+    res = []
+    if 'စုံ' in b_type:
+        for i in range(100):
+            s = f"{i:02d}"
+            total = int(s[0]) + int(s[1])
+            if total % 2 == 0:
+                res.append(s)
+    elif 'မ' in b_type:
+        for i in range(100):
+            s = f"{i:02d}"
+            total = int(s[0]) + int(s[1])
+            if total % 2 != 0:
+                res.append(s)
+    return res
+
+print("✅ Star စာရင်းကိုင်လေး Bot အလုပ်လုပ်နေပြီ...")
+print("✅ Owner က /start နဲ့ /close နဲ့ Control လုပ်လို့ရပြီ")
+print("✅ သတ်မှတ်ထားတဲ့ Group မှာသာ အလုပ်လုပ်မယ်")
+bot.polling()
