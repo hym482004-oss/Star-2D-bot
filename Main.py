@@ -1,10 +1,26 @@
 import telebot
 import re
 import itertools
+import os
 from threading import Thread
+from flask import Flask
 
 # ==============================================
-# 🔴 သတ်မှတ်ချက်များ (Token နှင့် ID များ) 🔴
+# 🔴 ၁။ Web Server ပိုင်း (Render Free Tier အတွက်)
+# ==============================================
+server = Flask(__name__)
+
+@server.route("/")
+def webhook():
+    return "Bot is running", 200
+
+def run_web():
+    # Render ကပေးတဲ့ PORT ကိုသုံးမယ်၊ မရှိရင် 8080 သုံးမယ်
+    port = int(os.environ.get("PORT", 8080))
+    server.run(host="0.0.0.0", port=port)
+
+# ==============================================
+# 🔴 ၂။ သတ်မှတ်ချက်များ (Token နှင့် ID များ)
 # ==============================================
 BOT_TOKEN = '8663479446:AAEHOXsSBCxpwh7fK3AbtEbbIAouBMFM9R4'
 OWNER_ID = -6023513934 
@@ -12,7 +28,7 @@ OWNER_ID = -6023513934
 bot = telebot.TeleBot(BOT_TOKEN, threaded=True, num_threads=10)
 
 # ==============================================
-# 🛠️ ဖော်မြူလာ Logic များ
+# 🛠️ ၃။ ဖော်မြူလာ Logic များ
 # ==============================================
 def get_one(num): return [num]
 def get_reverse(num): return [num, num[::-1]] if len(num) == 2 and num[0] != num[1] else [num]
@@ -49,7 +65,6 @@ def get_break_type(b_type):
         elif 'မ' in b_type and t % 2 != 0: res.append(s)
     return res
 
-# Admin များကို Mention ခေါ်ရန် Function
 def get_admin_mentions(chat_id):
     try:
         admins = bot.get_chat_administrators(chat_id)
@@ -61,7 +76,7 @@ def get_admin_mentions(chat_id):
     except: return "Admin များ"
 
 # ==============================================
-# 🤖 Bot Message Handlers
+# 🤖 ၄။ Bot Message Handlers
 # ==============================================
 
 @bot.message_handler(commands=['start'])
@@ -77,7 +92,6 @@ def process_msg(message):
     text = message.text.strip()
     lower_text = text.lower()
     
-    # ရာခိုင်နှုန်း သတ်မှတ်ချက်များ
     config = {
         'du': (0.07, 7, "Du"), 'mega': (0.07, 7, "Mega"), 'mm': (0.10, 10, "mm"),
         'maxi': (0.07, 7, "Maxi"), 'lao': (0.07, 7, "လာအို"), 'glo': (0.03, 3, "Glo"),
@@ -87,7 +101,6 @@ def process_msg(message):
     used_percent, percent_num, type_text = 0, 0, ""
     found = False
     
-    # အမျိုးအစား စစ်ဆေးခြင်း
     keywords_map = {
         'du': ['ဒူ', 'ဒု', 'dubai', 'du'],
         'mega': ['မီ', 'me', 'mega'],
@@ -100,17 +113,14 @@ def process_msg(message):
     for key, words in keywords_map.items():
         if any(w in lower_text for w in words):
             used_percent, percent_num, type_text = config[key]
-            found = True
-            break
+            found = True; break
     
-    # ၁။ အမျိုးအစား လုံးဝမပါခဲ့ရင် Admin တွေကို Mention ခေါ်မယ်
     if not found:
-        if re.search(r'\d+', text): # စာရင်းပို့တာ သေချာမှ (ဂဏန်းပါမှ) ခေါ်မယ်
+        if re.search(r'\d+', text):
             mentions = get_admin_mentions(message.chat.id)
-            bot.send_message(message.chat.id, f"⚠️ **အမျိုးအစား (Du/Mega/mm) မပါဝင်ပါ!**\n{mentions}\nလာစစ်ပေးပါဦးရှင့်။", parse_mode="Markdown")
+            bot.send_message(message.chat.id, f"⚠️ **အမျိုးအစား မပါဝင်ပါ!**\n{mentions}\nလာစစ်ပေးပါဦး။", parse_mode="Markdown")
         return
 
-    # စျေးနှုန်းနှင့် ဂဏန်းများ ခွဲထုတ်ခြင်း
     price_match = re.search(r'(\d+)\s*$', text)
     price = int(price_match.group(1)) if price_match else 0
     nums_all = re.findall(r'\d+', text)
@@ -120,7 +130,6 @@ def process_msg(message):
     result_list = []
     is_reverse = 'r' in lower_text or 'အာ' in lower_text
 
-    # Logic ခွဲခြားခြင်း
     if any(k in text for k in ['စုံဘရိတ်', 'မဘရိတ်', 'စုံbk', 'မbk']):
         result_list = get_break_type('စုံ' if 'စုံ' in text else 'မ')
     elif 'ကပ်' in text or 'ကို' in text:
@@ -143,24 +152,29 @@ def process_msg(message):
         rev = [n[::-1] for n in result_list if len(n) == 2 and n[0] != n[1]]
         result_list = list(set(result_list + rev))
 
-    # ၂။ စျေးနှုန်းမပါရင် သို့မဟုတ် တွက်လို့မရရင် Admin တွေကို Mention ခေါ်မယ်
     if not result_list or price == 0:
         mentions = get_admin_mentions(message.chat.id)
         bot.send_message(message.chat.id, f"⚠️ **စျေးနှုန်း သို့မဟုတ် ပုံစံ မှားယွင်းနေပါသည်!**\n{mentions}", parse_mode="Markdown")
         return
 
-    # တွက်ချက်ခြင်း
     total_original = len(result_list) * price
     discount = total_original * used_percent
     total_final = total_original - discount
 
-    # 🎯 Replay ပုံစံ (သင်အလိုရှိသည့်အတိုင်း)
     display = (f"{type_text} Total={int(total_original):,}ကျပ်\n\n"
                f"{percent_num}% cash back={int(discount):,}ကျပ်\n\n"
-               f"Total={int(total_final):,}ကျပ်  ဘဲ လွဲပါရှင့်")
+               f"Total={int(total_final):,}ကျပ် ဘဲ လွဲပါရှင့်")
 
     bot.reply_to(message, display)
 
-# Bot ကို အမြဲတမ်း Run နေစေရန်
-print("✅ Star 2D Bot is Live!")
-bot.infinity_polling()
+# ==============================================
+# 🔴 ၅။ Main Execution
+# ==============================================
+if __name__ == "__main__":
+    # Web Server ကို Thread နဲ့ run မယ်
+    Thread(target=run_web).start()
+    print("✅ Web Server started!")
+    
+    # Bot ကို run မယ်
+    print("✅ Bot is running...")
+    bot.infinity_polling()
