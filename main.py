@@ -24,6 +24,11 @@ def run_web():
 BOT_TOKEN = "YOUR_BOT_TOKEN"
 bot = telebot.TeleBot(BOT_TOKEN, threaded=True)
 
+# =========================
+# ADMIN LIST
+# =========================
+ADMINS = ["@admin1", "@owner"]
+
 
 # =========================
 # NORMALIZE
@@ -38,61 +43,45 @@ def normalize(text):
 
 
 # =========================
-# CALCULATE COUNT
+# COUNT ENGINE (YOUR LOGIC)
 # =========================
 def calculate_count(line):
+
     nums = re.findall(r'\d+', line)
     if not nums:
         return 0, False
 
-    # --- Check Reverse ---
     is_reverse = 'r' in line or 'အာ' in line
 
-    # --- Khwe Rule ---
     if "ခွေ" in line:
-        n = len(nums[0])
-        # Check both "ပူး" and "ပူး"
-        if "ပူး" in line or "ပူး" in line:
-            return (n * (n - 1)) + n, is_reverse
-        else:
-            return n * (n - 1), is_reverse
+        n = len(nums)
+        return n * (n - 1), is_reverse
 
-    # --- Break Rule (bk / ဘရိတ်) ---
-    if "bk" in line or "ဘရိတ်" in line:
-        bk_digits = re.findall(r'(\d+)bk', line)
-        return len(bk_digits) * 10, is_reverse
-
-    # --- Top Rule (ထိပ်) ---
-    if "ထိပ်" in line or "ထ" in line:
+    elif "bk" in line or "ဘရိတ်" in line:
         return 10, is_reverse
 
-    # --- Power / Nk / နက္ခတ် / အပူး / PH ---
-    if any(x in line for x in ['pw', 'ပါဝါ', 'nk', 'နက္ခတ်', 'အပူး', 'ph']):
+    elif "ထိပ်" in line:
         return 10, is_reverse
 
-    # --- Special Pattern ---
-    if any(x in line for x in ["စမ", "စစ", "မမ", "စုံစုံ", "စုံမ", "မစ်"]):
+    elif any(x in line for x in ['pw', 'ပါဝါ', 'nk', 'နက္ခတ်', 'အပူး']):
+        return 10, is_reverse
+
+    elif any(x in line for x in ["စမ", "စစ", "မမ"]):
         return 25, is_reverse
 
-    # --- Kap Rule (ကပ် / ကို) ---
-    if "ကပ်" in line or "ကို" in line:
-        if len(nums) >= 2:
-            n1 = len(nums[0])
-            n2 = len(nums[1])
-            return n1 * n2, is_reverse
-        else:
-            return len(nums), is_reverse
+    elif "ကပ်" in line:
+        return len(nums) * len(nums), is_reverse
 
-    # --- Default: List of numbers ---
-    return len(nums), is_reverse
+    else:
+        return len(nums), is_reverse
 
 
 # =========================
-# START COMMAND
+# START
 # =========================
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.reply_to(message, "✅ Bot စတင်ပါပြီ\nစာရင်းပို့ပြီးတွက်နိုင်ပါပြီ။")
+    bot.reply_to(message, "✅ Bot စတင်ပါပြီ")
 
 
 # =========================
@@ -105,47 +94,29 @@ def handle(message):
 
     try:
         text = message.text
-        lower_text = text.lower()
-
         if not text:
             return
 
-        # 🛑 RULE:
-        # 1. စာရင်းစစ်စကားလုံး ပါရမည်
-        # 2. ဒါမှမဟုတ် ဂဏန်း 2 လုံးတွဲ (xx) ပါရမည်
-        trigger_words = ['ခွေ', 'ပူး', 'ထိပ်', 'bk', 'ဘရိတ်', 'ကပ်', 'ကို', 'စမ', 'စစ', 'မမ', 'pw', 'ပါဝါ', 'nk', 'နက္ခတ်', 'အပူး', 'ph', 'r', 'အာ']
-        
-        if not any(word in lower_text for word in trigger_words) and not re.search(r'\d{2}', text):
+        lower_text = text.lower()
+
+        # =========================
+        # FILTER (GP SAFE)
+        # =========================
+        trigger_words = [
+            'ခွေ','ပူး','ထိပ်','bk','ကပ်','စမ','မမ','pw','nk','r','အပူး'
+        ]
+
+        has_digits = bool(re.search(r'\d', text))
+        has_trigger = any(w in lower_text for w in trigger_words)
+
+        if not has_digits and not has_trigger:
             return
 
-        # --- Company Check & Percentage ---
-        percent = 0
-        comp_name = ""
-        if any(k in lower_text for k in ['du', 'ဒု', 'ဒူ', 'dubai']):
-            percent = 7
-            comp_name = "Du"
-        elif any(k in lower_text for k in ['me', 'mega', 'မီ']):
-            percent = 7
-            comp_name = "Me"
-        elif any(k in lower_text for k in ['mm']):
-            percent = 10
-            comp_name = "MM"
-        elif any(k in lower_text for k in ['laos', 'လာအို', 'la']):
-            percent = 7
-            comp_name = "Laos"
-        elif any(k in lower_text for k in ['ld', 'london', 'လန်ဒန်', 'လန်လန်']):
-            percent = 7
-            comp_name = "LD"
-        else:
-            percent = 7
-            comp_name = "Company"
-
-        # --- Price Extraction ---
-        # Pattern: X R Y
+        # =========================
+        # PRICE DETECT
+        # =========================
         price_match = re.search(r'(\d+)\s*r\s*(\d+)', lower_text)
-        # Pattern: X-Y or X=Y
         price_match2 = re.search(r'(\d+)\s*[-=]\s*(\d+)', lower_text)
-        # Pattern: only price at end
         price_simple = re.search(r'(\d+)\s*$', lower_text)
 
         if price_match:
@@ -161,39 +132,74 @@ def handle(message):
             price_norm = 0
             price_rev = 0
 
-        # --- Split Lines ---
+        # =========================
+        # CALCULATION
+        # =========================
         lines = [l.strip() for l in normalize(text).split("\n") if l.strip()]
 
         total_amount = 0
 
         for line in lines:
-            count, is_reverse_mode = calculate_count(line)
+            count, is_reverse = calculate_count(line)
 
             if count <= 0:
                 continue
 
-            if is_reverse_mode:
+            if is_reverse:
                 total_amount += (count * price_norm) + (count * price_rev)
             else:
                 total_amount += count * price_norm
 
-        # --- Final Calculation ---
-        discount = total_amount * (percent / 100)
-        total_final = total_amount - discount
+        # =========================
+        # ADMIN ALERT (NO VALID DATA)
+        # =========================
+        if total_amount == 0 and has_digits:
+            admin_text = " ".join(ADMINS)
+            bot.reply_to(
+                message,
+                f"📢 {admin_text}\n⚠️ {user} ရဲ့စာရင်းကို စစ်ဆေးပေးပါရှင့်"
+            )
+            return
 
-        # --- Reply ---
+        # =========================
+        # % SYSTEM
+        # =========================
+        percent = 7
+        comp_name = "Company"
+
+        if any(k in lower_text for k in ['du', 'ဒု', 'dubai']):
+            percent = 7
+            comp_name = "Du"
+        elif any(k in lower_text for k in ['me', 'mega', 'မီ']):
+            percent = 7
+            comp_name = "Mega"
+        elif any(k in lower_text for k in ['mm']):
+            percent = 10
+            comp_name = "MM"
+        elif any(k in lower_text for k in ['lao', 'လာအို']):
+            percent = 7
+            comp_name = "Lao"
+        elif any(k in lower_text for k in ['ld', 'london']):
+            percent = 7
+            comp_name = "LD"
+
+        discount = total_amount * (percent / 100)
+        final_total = total_amount - discount
+
+        # =========================
+        # REPLY
+        # =========================
         reply = (
             f"👤 {user}\n"
             f"{comp_name} Total = {int(total_amount):,} ကျပ်\n"
             f"{percent}% Cash Back = {int(discount):,} ကျပ်\n"
-            f"Total = {int(total_final):,} ကျပ်ဘဲ လွဲပေးပါရှင့်"
+            f"Total = {int(final_total):,} ကျပ်"
         )
 
         bot.reply_to(message, reply)
 
     except Exception as e:
-        print(f"Error: {e}")
-        pass
+        print(e)
 
 
 # =========================
