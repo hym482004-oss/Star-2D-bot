@@ -78,8 +78,8 @@ if "ေခွ" in line or "ေခွပူး" in line:
         return 25, is_reverse
 
     # KAP / KHAP
-elif "ကပ်" in line or "ခပ်" in line:
-    if "ခပ်" in line:
+elif "ကပ်" in line or "ခပ" in line:
+    if "ခပ" in line:
         # ခပ် = ကိုယ့်ထည်ဖြတ် n × n
         n = len(nums[0])
         return n * n, is_reverse
