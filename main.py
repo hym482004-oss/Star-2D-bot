@@ -35,11 +35,16 @@ def calculate_shwethoon_master(input_text):
         if not line or any(kw == line for k in groups_config.values() for kw in k): continue
         line = line.translate(str.maketrans('၀၁၂၃၄၅၆၇၈၉', '0123456789'))
 
-        all_numbers = re.findall(r'\d+', line)
+                # (A) r သို့မဟုတ် ခပ တွေကို အရင်ရှင်းထုတ်လိုက်မှ ဈေးနှုန်းသီးသန့်ထွက်လာမှာပါ
+        temp_line = line.replace('r', ' ').replace('ခပ', ' ').replace('ခွေပူး', ' ')
+        all_numbers = re.findall(r'\d+', temp_line)
+        
         if not all_numbers: continue
         
+        # (B) ဈေးနှုန်းကို နောက်ဆုံးဂဏန်းအဖြစ် ယူမယ်
         price = int(all_numbers[-1])
-        bet_numbers = all_numbers[:-1] 
+        # (C) ရှေ့က ဂဏန်းတွေကိုပဲ ထိုးကွက်အဖြစ် ယူမယ်
+        bet_numbers = all_numbers[:-1]
 
         # (1) အကပ် Logic
         if any(x in line for x in ["/", "ကို", "ကပ်"]):
@@ -53,7 +58,7 @@ def calculate_shwethoon_master(input_text):
                     is_ledger = True; continue
 
         # (2) ထိပ် / ပိတ် / နပ / ဘရိတ်
-        if any(x in line for x in ["ထိပ်", "ပိတ်", "နပ", "နောက်", "ဘရိတ်", "ဘ"]):
+        if any(x in line for x in ["ထိပ်", "ပိတ်", "နပ", "နောက်", "ဘရိတ်", "ဘ","Bk"]):
             nums_to_count = "".join(bet_numbers)
             if nums_to_count:
                 total_sales += len(nums_to_count) * 10 * price
@@ -101,7 +106,7 @@ def calculate_shwethoon_master(input_text):
         if found_g: continue
 
         # (7) ဒဲ့ နှင့် R
-        two_digit_bets = re.findall(r'\d{2}', " ".join(bet_numbers))
+                two_digit_bets = re.findall(r'\d{2}', " ".join(map(str, bet_numbers)))
         if two_digit_bets:
             total_sales += len(two_digit_bets) * price * (2 if "r" in line else 1)
             is_ledger = True
