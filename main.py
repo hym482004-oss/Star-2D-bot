@@ -1,150 +1,136 @@
 import telebot
 import re
 
-TOKEN = "8669202237:AAFbnzLhJJKeEMKBYp5lfkWBCcMMYgqmiNY"
+TOKEN = "8669202237:AAEPCaS8x4jEsUaP6BQ-8-PM-b6_PN4hk5w"
 bot = telebot.TeleBot(TOKEN)
 
 def calculate_shwethoon_master(input_text):
     lines = input_text.strip().split('\n')
     total_sales = 0
+    is_ledger = False # စာရင်းဟုတ်မဟုတ် စစ်မယ့် variable
     
-    # --- ၁။ 2D Name & Percent သတ်မှတ်ချက် ---
+    # --- ၁။ နာမည်စစ်ဆေးခြင်း ---
     lower_full_text = input_text.lower()
-    percent = 0
-    two_d_name = ""
-
-    # Brand စာရင်း
+    percent, two_d_name = 0, ""
     groups_config = {
-        "Du": {"kw": ["du2d", "du", "ဒု", "ဒူ", "ဒူဘိူင်း", "ငဒူ", "dubai"], "p": 7},
-        "Mega": {"kw": ["mega", "မီ", "me", "မီဂါ"], "p": 7},
-        "MM": {"kw": ["mm", "ဗမာ"], "p": 10},
-        "Maxi": {"kw": ["maxi", "မက်ဆီ", "မက်စီ", "စီစီ"], "p": 7},
-        "Lao": {"kw": ["lao", "loa", "laos", "loas", "လာအို", "လာလာ", "la"], "p": 7},
-        "Global": {"kw": ["glo", "ကလို", "ဂလို", "global"], "p": 3},
-        "London": {"kw": ["ld", "landon", "london", "lan", "လန်ဒန်", "လန်လန်"], "p": 7}
+        "Du": ["du2d", "du", "ဒု", "ဒူ", "dubai"],
+        "Mega": ["mega", "မီ", "me", "မီဂါ"],
+        "MM": ["mm", "ဗမာ"],
+        "Maxi": ["maxi", "မက်ဆီ", "စီစီ"],
+        "Lao": ["lao", "laos", "လာအို", "la"],
+        "Global": ["glo", "ဂလို", "global"],
+        "London": ["ld", "london", "လန်လန်"]
     }
 
-    for name, data in groups_config.items():
-        if any(kw in lower_full_text for kw in data["kw"]):
-            two_d_name, percent = name, data["p"]
+    for name, keywords in groups_config.items():
+        if any(kw in lower_full_text for kw in keywords):
+            two_d_name = name
+            percent = 10 if name == "MM" else (3 if name == "Global" else 7)
             break
     
+    # နာမည်မပါရင် စာရင်းမဟုတ်ဘူးလို့ ယူဆပြီး ဘာမှပြန်မလုပ်ဘူး
     if not two_d_name:
-        return "📢 @Panda238 @livia308 \n⚠️ 2D Name မပါရှိသဖြင့် စစ်ပေးပါရှင့်။"
+        return None
 
-    # --- ၂။ စာရင်းတွက်ချက်ခြင်း Logic ---
+    # --- ၂။ စာရင်းတွက်ချက်ခြင်း ---
     for line in lines:
         line = line.strip().lower()
-        if not line: continue
-        
-        # နာမည်ပါတဲ့လိုင်းကို ကျော်မယ် (စာရင်းထဲမတွက်ဖို့)
-        is_name_line = False
-        for name in groups_config:
-            if any(kw == line for kw in groups_config[name]["kw"]):
-                is_name_line = True
-                break
-        if is_name_line: continue
-
-        # ဗမာဂဏန်းကို အင်္ဂလိပ်ပြောင်း
+        if not line or any(kw == line for k in groups_config.values() for kw in k): continue
         line = line.translate(str.maketrans('၀၁၂၃၄၅၆၇၈၉', '0123456789'))
 
-        # (A) ပတ်သီး (၁၉ ကွက်)
-        pats_keywords = ["ပတ်", "အပါ", "ပါ", "p", "ch"]
-        if any(x in line for x in pats_keywords) and not any(x in line for x in ["ပတ်ပူး", "ပူးပို"]):
-            parts = re.split(r'ပတ်|အပါ|ပါ|p|ch', line)
-            nums = re.findall(r'\d', parts[0])
-            price_match = re.findall(r'\d+', line)
-            if nums and price_match:
-                price = int(price_match[-1])
-                total_sales += (len(nums) * 19) * price
-                continue
+        # စာကြောင်းထဲမှာ ဂဏန်း (သို့) Keyword ပါမပါ စစ်မယ်
+        keywords = ["ပတ်", "ပါ", "ခွေ", "ခပ", "ကို", "ကပ်", "/", "ပူး", "ညီကို", "ဘရိတ်", "r"]
+        if not (re.search(r'\d', line) or any(k in line for k in keywords)):
+            continue
 
-        # (B) ပတ်ပူး / ထိပ်ပိတ် (၂၀ ကွက်)
-        p20_keywords = ["ပတ်ပူး", "ပတ်သီးအပူးပို", "ပတ်သီးပူးပို", "ပတ်ပူးပို", "ထိပ်ပိတ်", "ထပ", "ထန", "ထိပ်နောက်"]
-        if any(x in line for x in p20_keywords):
-            pattern = '|'.join(p20_keywords)
-            parts = re.split(pattern, line)
-            nums = re.findall(r'\d', parts[0])
-            price_match = re.findall(r'\d+', line)
-            if nums and price_match:
-                price = int(price_match[-1])
-                total_sales += (len(nums) * 20) * price
-                continue
-
-        # (C) အကပ် Logic
+        # (A) အကပ် Logic
         if any(x in line for x in ["/", "ကို", "ကပ်"]):
             parts = re.split(r'/|ကို|ကပ်', line)
             if len(parts) >= 2:
-                left_nums = re.findall(r'\d', parts[0])
-                right_nums = re.findall(r'\d', re.split(r'\s|r', parts[1])[0])
+                left = re.findall(r'\d', parts[0])
+                right = re.findall(r'\d', re.split(r'\s|r', parts[1])[0])
                 price_match = re.findall(r'\d+', line)
-                if left_nums and right_nums and price_match:
-                    price = int(price_match[-1])
-                    count = len(left_nums) * len(right_nums)
-                    total_sales += count * price
-                    if "r" in line: total_sales += count * price
+                if left and right and price_match:
+                    p = int(price_match[-1])
+                    total_sales += (len(left) * len(right)) * p * (2 if "r" in line else 1)
+                    is_ledger = True
                     continue
 
-        # (D) အခွေ (n * n-1)
-        if "ခ" in line and "ခွေပူး" not in line and "ခပ" not in line:
-            parts = re.split(r'ခွေ|ခ', line)
-            nums = re.findall(r'\d', parts[0])
+        # (B) ခွေပူး / ခပ Logic
+        kh_pu_keys = ["ခွေပူး", "ခပ", "အခွေပူး"]
+        if any(x in line for x in kh_pu_keys):
             price_match = re.findall(r'\d+', line)
+            match_key = re.findall('|'.join(kh_pu_keys), line)
+            if match_key:
+                nums = re.findall(r'\d', line.split(match_key[0])[0])
+                if nums and price_match:
+                    total_sales += (len(nums) * len(nums)) * int(price_match[-1])
+                    is_ledger = True
+                    continue
+
+        # (C) ခွေ (ရိုးရိုး) Logic
+        if "ခ" in line:
+            price_match = re.findall(r'\d+', line)
+            nums = re.findall(r'\d', line.split('ခ')[0])
             if nums and price_match:
                 n = len(nums)
-                price = int(price_match[-1])
-                total_sales += (n * (n - 1)) * price
+                total_sales += (n * (n - 1)) * int(price_match[-1])
+                is_ledger = True
                 continue
 
-        # (E) အုပ်စုလိုက်တွက်နည်းများ
-        groups_list = [
-            {"keys": ["ခွေပူး", "အပြီအပူး", "ခပ", "အခွေပူး"], "type": "kp"},
-            {"keys": ["အပူး", "ပူး", "puu", "pu"], "count": 10},
-            {"keys": ["စုံစုံ", "စစ", "မမ", "စုံမ", "မစုံ", "စမ", "မစ"], "count": 25},
-            {"keys": ["မပူး", "စုံပူး"], "count": 5},
-            {"keys": ["ပါဝါ", "pw", "power"], "count": 10},
-            {"keys": ["နက္ခတ်", "နက", "nk"], "count": 10},
-            {"keys": ["ညီကို", "ညီအကို", "ညီအစ်ကို"], "count": 20},
-            {"keys": ["စုံဘရိတ်", "စဘရိတ်", "စဘ", "မဘရိတ်", "မဘ"], "count": 50}
-        ]
+        # (D) ပတ်သီး / ပတ်ပူး
+        if any(x in line for x in ["ပတ်", "ပါ", "p", "ch"]):
+            price_match = re.findall(r'\d+', line)
+            parts = re.split(r'ပတ်|ပါ|p|ch', line)
+            nums = re.findall(r'\d', parts[0])
+            if nums and price_match:
+                count = 20 if any(x in line for x in ["ပတ်ပူး", "ပူးပို", "ထိပ်ပိတ်"]) else 19
+                total_sales += (len(nums) * count) * int(price_match[-1])
+                is_ledger = True
+                continue
 
-        found_grp = False
-        for g in groups_list:
-            if any(k in line for k in g["keys"]):
+        # (E) အုပ်စုလိုက် (အပူး, ညီကို, စုံမ, ဘရိတ်)
+        group_map = {
+            "အပူး": 10, "ပူး": 10, "pu": 10,
+            "စုံစုံ": 25, "မမ": 25, "စုံမ": 25, "မစုံ": 25, "စမ": 25, "မစ": 25, "စစ": 25,
+            "ညီကို": 20, "ညီအကို": 20,
+            "စုံဘရိတ်": 50, "စဘရိတ်": 50, "စဘ": 50, "မဘရိတ်": 50, "မဘ": 50
+        }
+        found_g = False
+        for k, v in group_map.items():
+            if k in line:
                 price_match = re.findall(r'\d+', line)
                 if price_match:
-                    price = int(price_match[-1])
-                    if g.get("type") == "kp":
-                        nums = re.findall(r'\d', line.split(g["keys"][0])[0])
-                        total_sales += (len(nums) * len(nums)) * price
-                    else:
-                        total_sales += g["count"] * price
-                    found_grp = True
+                    total_sales += v * int(price_match[-1])
+                    found_g = True
+                    is_ledger = True
                     break
-        if found_grp: continue
+        if found_g: continue
 
         # (F) ဒဲ့ နှင့် R (ပုံမှန်)
         nums = re.findall(r'\d{2}', line)
         if nums:
             price_match = re.findall(r'\d+', line)
             if price_match:
-                price = int(price_match[-1])
-                total_sales += len(nums) * price
-                if "r" in line: total_sales += len(nums) * price
+                p = int(price_match[-1])
+                total_sales += len(nums) * p * (2 if "r" in line else 1)
+                is_ledger = True
 
-    # --- ၃။ ရလဒ်ထုတ်ပေးခြင်း ---
+    # စာရင်း အမှန်တကယ် တွက်ချက်ထားခြင်း မရှိရင် ဘာမှပြန်မဖြေဘူး
+    if not is_ledger:
+        return None
+
+    # --- ၃။ Summary ---
     cash_back = (total_sales * percent) / 100
     net_total = total_sales - cash_back
-    
-    return (f"✅ 2D Name: {two_d_name}\n"
-            f"━━━━━━━━━━━━━━\n"
-            f"💰 စုစုပေါင်း: {total_sales:,} ကျပ်\n"
-            f"📉 {percent}% cash bock= {int(cash_back):,} ကျပ်\n"
-            f"━━━━━━━━━━━━━━\n"
+    return (f"✅ 2D Name: {two_d_name}\n━━━━━━━━━━━━━━\n💰 စုစုပေါင်း: {total_sales:,} ကျပ်\n"
+            f"📉 {percent}% ချွေ: {int(cash_back):,} ကျပ်\n━━━━━━━━━━━━━━\n"
             f"💵 လက်ခံရမည့်ငွေ: {int(net_total):,} ကျပ်ဘဲ လွဲပါရှင့်")
 
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
-    bot.reply_to(message, calculate_shwethoon_master(message.text))
+    response = calculate_shwethoon_master(message.text)
+    if response: # response ရှိမှသာ (စာရင်းဖြစ်မှသာ) reply ပြန်မယ်
+        bot.reply_to(message, response)
 
 bot.infinity_polling()
