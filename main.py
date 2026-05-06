@@ -26,13 +26,12 @@ def calculate_2d_ledger(input_text):
     # --- ၂။ တစ်ကြောင်းချင်းစီကို စတင်တွက်ချက်ခြင်း ---
     for line in lines:
         line = line.strip().lower()
+        if not line: continue
         
-        # နာမည်ပါတဲ့လိုင်း သို့မဟုတ် blank line ကို ကျော်မည်
-        if not line or any(x == two_d_name.lower() or x in line for x in ["mega", "mm", "du", "me", "မီဂါ"]):
-            if len(line) < 5: # "Mm", "Me" ကဲ့သို့သော နာမည်သီးသန့်လိုင်းများကို ကျော်ရန်
-                continue
+        # နာမည်သီးသန့်ပါတဲ့လိုင်းကို ကျော်မည်
+        if line == two_d_name.lower(): continue
 
-        # (A) Special Keywords (ညီကို=20, အပူး/နက္ခတ်/ပါဝါ=10)
+        # (A) Special Keywords Rule (ညီကို=20, နက္ခတ်/အပူး/ပါဝါ=10)
         special_map = {"အပူး": 10, "နက္ခတ်": 10, "ပါဝါ": 10, "ညီကို": 20}
         found_sp = False
         for kw, slots in special_map.items():
@@ -44,7 +43,7 @@ def calculate_2d_ledger(input_text):
                     break
         if found_sp: continue
 
-        # (B) n x n Logic (အပီးအပူးပါ)
+        # (B) n x n Rule (အပီးအပူးပါ / အပီးပူးပါ)
         if any(x in line for x in ["အပီးအပူးပါ", "အပြီးအပူးပါ", "အပီးပူးပါ"]):
             parts = re.split(r'အပီး|အပြီး', line)
             nums = re.findall(r'\d', parts[0])
@@ -54,35 +53,40 @@ def calculate_2d_ledger(input_text):
                 total_sales += (n * n) * int(price_match[0])
             continue
 
-        # (C) ပုံမှန် R နှင့် ဒဲ့ (Special handling for * and other symbols)
-        # သင်္ကေတများ (*, /, =, -) ကို space ဖြင့် အစားထိုးသည်
+        # (C) ခွေတွက်နည်း (ဥပမာ- 123456 ခွေ ၂၅၀)
+        if "ခွေ" in line:
+            parts = line.split("ခွေ")
+            nums = re.findall(r'\d', parts[0])
+            price_match = re.findall(r'\d+', parts[1])
+            if nums and price_match:
+                n = len(nums)
+                total_slots = (n * (n - 1)) # အပြန်အလှန် ခွေထားခြင်း
+                total_sales += total_slots * int(price_match[0])
+            continue
+
+        # (D) ပုံမှန် R နှင့် ဒဲ့ (Parsing အသစ်)
+        # *, /, =, -, , စတဲ့ သင်္ကေတတွေကို space ပြောင်းမည်
         cleaned_line = re.sub(r'[*\/=\-,]', ' ', line)
-        
-        # စာကြောင်းအဆုံးမှ 'r' နှင့် ဈေးနှုန်းကို ရှာဖွေသည်
         main_match = re.search(r'(.+?)\s*(r)?\s*(\d+)$', cleaned_line)
         
         if main_match:
             number_part = main_match.group(1)
             is_r = main_match.group(2) is not None
             price = int(main_match.group(3))
-            
-            # ဂဏန်းအတွဲများကို ရှာဖွေခြင်း
             all_numbers = re.findall(r'\d+', number_part)
-            count = len(all_numbers)
             
-            multiplier = 2 if is_r else 1
-            total_sales += count * multiplier * price
+            for num in all_numbers:
+                # ဂဏန်းအတွဲလိုက် (ဥပမာ 13-18-36-68) ဖြစ်စေ၊ တစ်လုံးချင်းဖြစ်စေ တွက်ပေးမည်
+                multiplier = 2 if is_r else 1
+                total_sales += 1 * multiplier * price
 
     # --- ၃။ Summary ထုတ်ပြန်ခြင်း ---
     cash_back_amount = (total_sales * percent) / 100
     net_total = total_sales - cash_back_amount
     
-    summary = (
-        f"✅ 2D Name: {two_d_name}\n"
-        f"━━━━━━━━━━━━━━\n"
-        f"💰 စုစုပေါင်း: {total_sales:,} ကျပ်\n"
-        f"📉 {percent}% ချွေ: {int(cash_back_amount):,} ကျပ်\n"
-        f"━━━━━━━━━━━━━━\n"
-        f"💵 လက်ခံရမည့်ငွေ: {int(net_total):,} ကျပ်"
-    )
-    return summary
+    return (f"✅ 2D Name: {two_d_name}\n"
+            f"━━━━━━━━━━━━━━\n"
+            f"💰 စုစုပေါင်း: {total_sales:,} ကျပ်\n"
+            f"📉 {percent}% ချွေ: {int(cash_back_amount):,} ကျပ်\n"
+            f"━━━━━━━━━━━━━━\n"
+            f"💵 လက်ခံရမည့်ငွေ: {int(net_total):,} ကျပ်")
