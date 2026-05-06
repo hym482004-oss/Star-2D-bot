@@ -85,7 +85,7 @@ def calculate_count(line):
 # =========================
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.reply_to(message, "✅ Bot စတင်ပါပြီ")
+    bot.reply_to(message, "✅ စာရင်းစတွက်ပေးပါမယ်ရှင့်")
 
 
 # =========================
@@ -108,8 +108,8 @@ def handle(message):
         # FILTER
         # =========================
         trigger_words = [
-            'ခွေ','ပူး','ထိပ်','bk','ကပ်','စမ','မမ','pw','nk','r','အပူး'
-        ]
+            'ခွေ','ပူး','ထိပ်','bk','ကပ်','စမ','မမ','pw','nk','r','အပူး',
+       'ခပ' ]
 
         has_digits = bool(re.search(r'\d', text))
         has_trigger = any(w in lower_text for w in trigger_words)
