@@ -182,7 +182,7 @@ def handle(message):
         if total_amount == 0 and has_digits:
             bot.reply_to(
                 message,
-                f"📢 {' '.join(ADMINS)}\n⚠️ {user} ရဲ့စာရင်းစစ်ပေးပါ"
+                f"📢 {' '.join(ADMINS)}\n⚠️ {user} ရဲ့စာရင်း လာစစ်ပေးပါ"
             )
             return
 
@@ -212,7 +212,7 @@ def handle(message):
             f"👤 {user}\n"
             f"{comp_name} Total = {int(total_amount):,} ကျပ်\n"
             f"{percent}% Cash Back = {int(discount):,} ကျပ်\n"
-            f"Total = {int(final):,} ကျပ်"
+            f"Total = {int(final):,} ကျပ်ဘဲ လွဲပါရှင့်"
         )
 
         bot.reply_to(message, reply)
