@@ -139,7 +139,7 @@ def calculate_shwethoon_master(input_text):
     return (f"✅ 2D Name: {two_d_name}\n"
             f"━━━━━━━━━━━━━━\n"
             f"💰 စုစုပေါင်း: {total_sales:,} ကျပ်\n"
-            f"📉 {percent}% ချွေ: {int(cash_back):,} ကျပ်\n"
+            f"📉 {percent}% cash bock= {int(cash_back):,} ကျပ်\n"
             f"━━━━━━━━━━━━━━\n"
             f"💵 လက်ခံရမည့်ငွေ: {int(net_total):,} ကျပ်ဘဲ လွဲပါရှင့်")
 
