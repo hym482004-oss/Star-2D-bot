@@ -88,6 +88,15 @@ elif "ကပ်" in line or "ခပ်" in line:
         if len(nums) >= 2:
             return len(nums[0]) * len(nums[1]), is_reverse
         else:
+            # တစ်ခုတည်းဆိုရင် ကိုယ့်ထည်ဖြတ်လိုပဲ
+            n = len(nums[0])
+            return n * n, is_reverse
+
+    else:
+        # ကပ် = ဘယ်ဘက် × ညာဘက်
+        if len(nums) >= 2:
+            return len(nums[0]) * len(nums[1]), is_reverse
+        else:
             return len(nums[0]) * len(nums[0]), is_reverse
 
 
