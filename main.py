@@ -79,7 +79,7 @@ def calculate_shwethoon_master(input_text):
         if any(x in line for x in ["ပတ်", "ပါ", "p", "ch"]):
             nums_to_patt = "".join(bet_numbers)
             if nums_to_patt:
-                c = 20 if any(x in line for x in ["ပတ်ပူး", "ပူးပို", "ထိပ်ပိတ်"]) else 19
+                c = 20 if any(x in line for x in ["ပတ်ပူး", "ပူးပို", "ထိပ်ပိတ်","ထိပ်နောက်","ထန"]) else 19
                 total_sales += len(nums_to_patt) * c * price
                 is_ledger = True; continue
 
