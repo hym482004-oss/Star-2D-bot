@@ -52,9 +52,14 @@ def calculate_count(line):
     is_reverse = 'r' in line or 'အာ' in line
 
     # KHWE
-    if "ခွေ" in line:
-        n = len(nums)
+if "ေခွ" in line or "ေခွပူး" in line:
+    # nums[0] ကိုယ်တိုင်ရဲ့ အရှည်ကို ယူရမှာ
+    n = len(nums[0]) 
+    if "ပူး" in line:
+        return (n * (n - 1)) + n, is_reverse
+    else:
         return n * (n - 1), is_reverse
+
 
     # POWER TYPE
     elif any(x in line for x in ['pw', 'ပါဝါ', 'nk', 'နက္ခတ်', 'အပူး']):
@@ -72,9 +77,19 @@ def calculate_count(line):
     elif any(x in line for x in ["စမ", "စစ", "မမ"]):
         return 25, is_reverse
 
-    # KAP
-    elif "ကပ်" in line:
-        return len(nums) * len(nums), is_reverse
+    # KAP / KHAP
+elif "ကပ်" in line or "ခပ်" in line:
+    if "ခပ်" in line:
+        # ခပ် = ကိုယ့်ထည်ဖြတ် n × n
+        n = len(nums[0])
+        return n * n, is_reverse
+    else:
+        # ကပ် = ဘယ်ဘက် × ညာဘက်
+        if len(nums) >= 2:
+            return len(nums[0]) * len(nums[1]), is_reverse
+        else:
+            return len(nums[0]) * len(nums[0]), is_reverse
+
 
     # DEFAULT
     return len(nums), is_reverse
