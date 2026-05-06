@@ -4,7 +4,7 @@ def calculate_2d_ledger(input_text):
     lines = input_text.strip().split('\n')
     total_sales = 0
     
-    # --- ၁။ 2D Name & Percent သတ်မှတ်ချက် (Keywords အစုံ) ---
+    # --- ၁။ 2D Name & Percent သတ်မှတ်ချက် ---
     lower_text = input_text.lower()
     percent = 0
     two_d_name = ""
@@ -19,7 +19,6 @@ def calculate_2d_ledger(input_text):
         "London": {"kw": ["ld", "landon", "london", "lan", "လန်ဒန်", "လန်လန်"], "p": 7}
     }
 
-    # Name ရှာဖွေခြင်း
     for name, data in groups_config.items():
         if any(kw in lower_text for kw in data["kw"]):
             two_d_name, percent = name, data["p"]
@@ -33,19 +32,11 @@ def calculate_2d_ledger(input_text):
         line = line.strip().lower()
         if not line or len(line) < 2: continue
         
-        # နာမည်ပါတဲ့လိုင်းကို ကျော်မယ် (တွက်ချက်မှုထဲမထည့်အောင်)
-        is_name_line = False
-        for name in groups_config:
-            if line in groups_config[name]["kw"]:
-                is_name_line = True
-                break
-        if is_name_line: continue
-
         # Symbols တွေကို space ပြောင်းမယ်
         line = re.sub(r'[-\*/\.]', ' ', line)
         full_line_eng = line.translate(str.maketrans('၀၁၂၃၄၅၆၇၈၉', '0123456789'))
 
-        # (A) ခွေပူး (n x n) - ဥပမာ 156789ခွေပူး 300
+        # (A) ခွေပူး (n x n)
         k_p_keys = ["ခွေပူး", "အပြီအပူး", "အပီအပူး", "ခပ", "အခွေပူး", "ခွေအပူး"]
         if any(x in line for x in k_p_keys):
             pattern = '|'.join(k_p_keys)
@@ -53,7 +44,7 @@ def calculate_2d_ledger(input_text):
             if parts:
                 nums = re.findall(r'\d', parts[0])
                 if nums:
-                    num_count = len(nums) * len(nums) # 6 လုံးဆို 36 ကွက်
+                    num_count = len(nums) * len(nums)
                     price_match = re.findall(r'\d+', full_line_eng)
                     if price_match:
                         price = int(price_match[-1])
@@ -73,31 +64,19 @@ def calculate_2d_ledger(input_text):
                         total_sales += (n * (n - 1)) * price
                         continue
 
-        # (C) ပတ်သီး / p / ch (၁၉ ကွက်)
-        if any(x in line for x in ["ပတ်", "အပါ", "ပါ", "p", "ch"]) and not any(x in line for x in ["ပတ်ပူး", "ပူးပို"]):
-            parts = re.split(r'ပတ်|အပါ|ပါ|p|ch', line)
+        # (C) ပတ်သီး (၁၉/၂၀ ကွက်)
+        if any(x in line for x in ["ပတ်", "အပါ", "ပါ", "p", "ch", "ထိပ်ပိတ်", "ထပ"]):
+            is_p20 = any(x in line for x in ["ပတ်ပူး", "ပူးပို", "ထိပ်ပိတ်", "ထပ", "ထန"])
+            parts = re.split(r'ပတ်|အပါ|ပါ|p|ch|ထိပ်ပိတ်|ထပ', line)
             if parts:
                 nums = re.findall(r'\d', parts[0])
                 price_match = re.findall(r'\d+', full_line_eng)
                 if price_match and nums:
                     price = int(price_match[-1])
-                    total_sales += (len(nums) * 19) * price
+                    total_sales += (len(nums) * (20 if is_p20 else 19)) * price
                     continue
 
-        # (D) ပတ်ပူး / ထိပ်ပိတ် / ထိပ်နောက် (၂၀ ကွက်)
-        p20_keywords = ["ပတ်ပူး", "ပတ်သီးအပူးပို", "ပတ်သီးပူးပို", "ပတ်ပူးပို", "ထိပ်ပိတ်", "ထပ", "ထန", "ထိပ်နောက်"]
-        if any(x in line for x in p20_keywords):
-            pattern = '|'.join(p20_keywords)
-            parts = re.split(pattern, line)
-            if parts:
-                nums = re.findall(r'\d', parts[0])
-                price_match = re.findall(r'\d+', full_line_eng)
-                if price_match and nums:
-                    price = int(price_match[-1])
-                    total_sales += (len(nums) * 20) * price
-                    continue
-
-        # (E) ဒဲ့ နှင့် R (300R200 သို့မဟုတ် R200)
+        # (D) ဒဲ့ နှင့် R
         match = re.search(r'(\d+)?\s*(r)\s*(\d+)$', line, re.IGNORECASE)
         if match:
             number_part = line[:match.start()]
@@ -109,7 +88,7 @@ def calculate_2d_ledger(input_text):
                     total_sales += (int(d_price_str) + r_price) if d_price_str else (r_price * 2)
                 continue
 
-        # (F) အုပ်စုလိုက်တွက်နည်းများ
+        # (E) အုပ်စုလိုက် (စုံမ၊ ဘရိတ်၊ ညီကို၊ အပူး၊ ထိပ်/ပိတ်)
         groups_list = [
             {"keys": ["စုံဘရိတ်", "မဘရိတ်"], "count": 50},
             {"keys": ["စုံစုံ", "စူံစူံ", "စူံစုံ", "စုံစူံ", "မမ", "စုံမ", "မစုံ", "စမ", "မစ", "စစ"], "count": 25},
