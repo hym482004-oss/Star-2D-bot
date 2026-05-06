@@ -30,7 +30,7 @@ def calculate_shwethoon_master(input_text):
             break
     
     if not two_d_name:
-        return "📢 @admin1 @owner \n⚠️ 2D Name မပါရှိသဖြင့် စစ်ပေးပါရှင့်။"
+        return "📢 @Panda238 @livia308 \n⚠️ 2D Name မပါရှိသဖြင့် စစ်ပေးပါရှင့်။"
 
     # --- ၂။ စာရင်းတွက်ချက်ခြင်း Logic ---
     for line in lines:
