@@ -103,3 +103,16 @@ def calculate_2d_ledger(input_text):
         f"💵 လက်ခံရမည့်ငွေ: {int(net_total):,} ကျပ်"
     )
     return summary
+    
+bot.reply_to(message, reply)
+
+    except Exception as e:
+        print("ERROR:", e)
+
+
+# =========================
+# RUN
+# =========================
+if __name__ == "__main__":
+    Thread(target=run_web).start()
+    bot.infinity_polling()
