@@ -1,7 +1,7 @@
 import telebot
 import re
 
-TOKEN = "8669202237:AAEPCaS8x4jEsUaP6BQ-8-PM-b6_PN4hk5w"
+TOKEN = "8669202237:AAGAU29lQRSlT4sRwvG6YIxsmlJsnGSd-Tc"
 bot = telebot.TeleBot(TOKEN)
 
 def calculate_shwethoon_master(input_text):
