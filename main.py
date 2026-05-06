@@ -1,5 +1,8 @@
+import telebot
 import re
-
+import os
+from threading import Thread
+from flask import Flask
 def calculate_2d_ledger(input_text):
     # --- ၁။ 2D Name စစ်ဆေးခြင်း ---
     lower_text = input_text.lower()
@@ -72,5 +75,15 @@ def calculate_2d_ledger(input_text):
     return f"✅ 2D Name: {found_name.upper()}\n" \
            f"💰 စုစုပေါင်း: {total_amount:,} ကျပ်\n" \
            f"📉 {cash_back_percent}% ချွေ: {int(cash_back_amount):,} ကျပ်\n" \
-           f"💵 လက်ခံရမည့်ငွေ: {int(net_total):,} ကျပ်"
+           f"💵 လက်ခံရမည့်ငွေ: {int(net_total):,} ကျပ်ဘဲ လွဲပေးပါရှင့် "
+except Exception as e:
+bot.reply_to(message, reply)
+        print("ERROR:", e)
 
+
+# =========================
+# RUN
+# =========================
+if __name__ == "__main__":
+    Thread(target=run_web).start()
+    bot.infinity_polling()
