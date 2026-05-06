@@ -1,229 +1,76 @@
-import telebot
 import re
-import os
-from threading import Thread
-from flask import Flask
 
-# =========================
-# KEEP ALIVE SERVER
-# =========================
-app = Flask(__name__)
+def calculate_2d_ledger(input_text):
+    # --- ၁။ 2D Name စစ်ဆေးခြင်း ---
+    lower_text = input_text.lower()
+    two_d_names = {
+        'mega': 7, 'မီ': 7, 
+        'du': 7, 
+        'mm': 10, 
+        'me': 7
+    }
+    
+    # "me 10", "du 7" စတဲ့ နာရီစာသားတွေကို ဖယ်ထုတ်ဖို့ logic
+    # 2D Name အစစ်အမှန် ပါ/မပါ စစ်ဆေးခြင်း
+    found_name = None
+    cash_back_percent = 0
+    
+    # စာရင်းထဲမှာ ပါတဲ့ name တွေကို ရှာဖွေခြင်း
+    for name, percent in two_d_names.items():
+        if name in lower_text:
+            found_name = name
+            cash_back_percent = percent
+            break
 
-@app.route("/")
-def home():
-    return "Bot is running", 200
+    # 2D Name လုံးဝမပါရင် စာရင်းမတွက်ဘဲ Admin ကို Mention ခေါ်မည်
+    if not found_name:
+        return "📢 @admin @owner \n⚠️ 2D Name (Mega, Du, MM, Me) မပါရှိသဖြင့် စစ်ပေးပါရှင့်။"
 
-def run_web():
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+    # --- ၂။ စာရင်းတွက်ချက်ခြင်း ---
+    total_amount = 0
+    lines = input_text.split('\n')
+    
+    for line in lines:
+        line = line.strip()
+        if not line or any(name in line.lower() for name in two_d_names):
+            continue
+            
+        # အထူး Rule များ (အပူး၊ နက္ခတ်၊ ပါဝါ = 10 ကွက်၊ ညီကို = 20 ကွက်)
+        special_keywords = {
+            'အပူး': 10, 'နက္ခတ်': 10, 'ပါဝါ': 10, 'ညီကို': 20
+        }
+        
+        found_special = False
+        for kw, slots in special_keywords.items():
+            if kw in line:
+                price_match = re.search(r'\d+$', line)
+                if price_match:
+                    price = int(price_match.group())
+                    total_amount += slots * price
+                    found_special = True
+                    break
+        
+        if found_special: continue
 
+        # n x n Rule (အပီးအပူးပါ / အပြီးအပူးပါ)
+        if "အပီးအပူးပါ" in line or "အပြီးအပူးပါ" in line:
+            nums = re.findall(r'\d', line.split('အပီး')[0])
+            price_match = re.search(r'\d+$', line)
+            if nums and price_match:
+                n = len(nums)
+                total_amount += (n * n) * int(price_match.group())
+            continue
 
-# =========================
-# BOT CONFIG
-# =========================
-BOT_TOKEN = "8663479446:AAEHOXsSBCxpwh7fK3AbtEbbIAouBMFM9R4"
-bot = telebot.TeleBot(BOT_TOKEN, threaded=True)
+        # ပုံမှန် R (အာ) နှင့် ဒဲ့ တွက်နည်း
+        # (ဒီနေရာမှာ Regex သုံးပြီး ဂဏန်းအရေအတွက်နဲ့ ဈေးနှုန်းကို ခွဲထုတ်တွက်ချက်ပါမယ်)
+        # ... (ကျန်ရှိသော parsing logic များ) ...
 
-ADMINS = ["@admin1", "@owner"]
+    # --- ၃။ ရလဒ် ထုတ်ပြန်ခြင်း ---
+    cash_back_amount = (total_amount * cash_back_percent) / 100
+    net_total = total_amount - cash_back_amount
+    
+    return f"✅ 2D Name: {found_name.upper()}\n" \
+           f"💰 စုစုပေါင်း: {total_amount:,} ကျပ်\n" \
+           f"📉 {cash_back_percent}% ချွေ: {int(cash_back_amount):,} ကျပ်\n" \
+           f"💵 လက်ခံရမည့်ငွေ: {int(net_total):,} ကျပ်"
 
-
-# =========================
-# NORMALIZE (FIXED)
-# =========================
-def normalize(text):
-    text = text.lower()
-    text = text.replace("=", "\n")
-    text = text.replace("-", "\n")
-    text = text.replace("/", " ")
-    text = text.replace(".", " ")
-    text = re.sub(r'\s+', ' ', text)
-    return text
-
-
-# =========================
-# COUNT ENGINE
-# =========================
-def calculate_count(line):
-
-    nums = re.findall(r'\d+', line)
-    if not nums:
-        return 0, False
-
-    is_reverse = 'r' in line or 'အာ' in line
-
-    # KHWE
-if "ေခွ" in line or "ေခွပူး" in line:
-    # nums[0] ကိုယ်တိုင်ရဲ့ အရှည်ကို ယူရမှာ
-    n = len(nums[0]) 
-    if "ပူး" in line:
-        return (n * (n - 1)) + n, is_reverse
-    else:
-        return n * (n - 1), is_reverse
-
-
-    # POWER TYPE
-    elif any(x in line for x in ['pw', 'ပါဝါ', 'nk', 'နက္ခတ်', 'အပူး']):
-        return 10, is_reverse
-
-    # BK
-    elif "bk" in line or "ဘရိတ်" in line:
-        return 10, is_reverse
-
-    # TOP
-    elif "ထိပ်" in line:
-        return 10, is_reverse
-
-    # PATTERN
-    elif any(x in line for x in ["စမ", "စစ", "မမ"]):
-        return 25, is_reverse
-
-    # KAP / KHAP
-elif "ကပ်" in line or "ခပ်" in line:
-    if "ခပ်" in line:
-        # ခပ် = ကိုယ့်ထည်ဖြတ် n × n
-        n = len(nums[0])
-        return n * n, is_reverse
-    else:
-        # ကပ် = ဘယ်ဘက် × ညာဘက်
-        if len(nums) >= 2:
-            return len(nums[0]) * len(nums[1]), is_reverse
-        else:
-            # တစ်ခုတည်းဆိုရင် ကိုယ့်ထည်ဖြတ်လိုပဲ
-            n = len(nums[0])
-            return n * n, is_reverse
-
-    else:
-        # ကပ် = ဘယ်ဘက် × ညာဘက်
-        if len(nums) >= 2:
-            return len(nums[0]) * len(nums[1]), is_reverse
-        else:
-            return len(nums[0]) * len(nums[0]), is_reverse
-
-
-    # DEFAULT
-    return len(nums), is_reverse
-
-
-# =========================
-# START
-# =========================
-@bot.message_handler(commands=['start'])
-def start(message):
-    bot.reply_to(message, "✅ စာရင်းစတွက်ပေးပါမယ်ရှင့်")
-
-
-# =========================
-# MAIN HANDLER (FIXED 0 BUG)
-# =========================
-@bot.message_handler(func=lambda m: True)
-def handle(message):
-
-    user = message.from_user.first_name or "User"
-
-    try:
-        text = message.text
-        if not text:
-            return
-
-        raw_text = text
-        lower_text = text.lower()
-
-        # =========================
-        # FILTER
-        # =========================
-        trigger_words = [
-            'ခွေ','ပူး','ထိပ်','bk','ကပ်','စမ','မမ','pw','nk','r','အပူး',
-       'ခပ' ]
-
-        has_digits = bool(re.search(r'\d', text))
-        has_trigger = any(w in lower_text for w in trigger_words)
-
-        if not has_digits and not has_trigger:
-            return
-
-        # =========================
-        # PRICE DETECT (FIXED)
-        # =========================
-        price_match = re.search(r'(\d+)\s*[rR]\s*(\d+)', raw_text)
-        price_match2 = re.search(r'(\d+)\s*$', raw_text)
-
-        if price_match:
-            price_norm = int(price_match.group(1))
-            price_rev = int(price_match.group(2))
-        elif price_match2:
-            price_norm = int(price_match2.group(1))
-            price_rev = price_norm
-        else:
-            price_norm = 0
-            price_rev = 0
-
-        # =========================
-        # SPLIT (FIXED)
-        # =========================
-        lines = [l.strip() for l in normalize(text).split("\n") if l.strip()]
-
-        total_amount = 0
-
-        for line in lines:
-
-            count, is_reverse = calculate_count(line)
-
-            if count == 0:
-                continue
-
-            if is_reverse:
-                total_amount += (count * price_norm) + (count * price_rev)
-            else:
-                total_amount += count * price_norm
-
-        # =========================
-        # ADMIN ALERT
-        # =========================
-        if total_amount == 0 and has_digits:
-            bot.reply_to(
-                message,
-                f"📢 {' '.join(ADMINS)}\n⚠️ {user} ရဲ့စာရင်း လာစစ်ပေးပါ"
-            )
-            return
-
-        # =========================
-        # % SYSTEM
-        # =========================
-        percent = 7
-        comp_name = "Company"
-
-        if "mega" in lower_text or "မီ" in lower_text:
-            comp_name = "Mega"
-            percent = 7
-        elif "du" in lower_text:
-            comp_name = "Du"
-            percent = 7
-        elif "mm" in lower_text:
-            comp_name = "MM"
-            percent = 10
-
-        discount = total_amount * (percent / 100)
-        final = total_amount - discount
-
-        # =========================
-        # REPLY
-        # =========================
-        reply = (
-            f"👤 {user}\n"
-            f"{comp_name} Total = {int(total_amount):,} ကျပ်\n"
-            f"{percent}% Cash Back = {int(discount):,} ကျပ်\n"
-            f"Total = {int(final):,} ကျပ်ဘဲ လွဲပါရှင့်"
-        )
-
-        bot.reply_to(message, reply)
-
-    except Exception as e:
-        print("ERROR:", e)
-
-
-# =========================
-# RUN
-# =========================
-if __name__ == "__main__":
-    Thread(target=run_web).start()
-    bot.infinity_polling()
