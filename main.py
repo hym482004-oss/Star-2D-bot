@@ -1,4 +1,4 @@
-import telebot
+mport telebot
 import re
 
 TOKEN = "8669202237:AAGAU29lQRSlT4sRwvG6YIxsmlJsnGSd-Tc"
