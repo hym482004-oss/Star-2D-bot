@@ -1,7 +1,7 @@
 import telebot
 
 # Leo Bot Token
-TOKEN = "8669202237:AAG9nQ7Bxp-qTkKnwaiyp6ls73Y8Bphm5n0"
+TOKEN = "8669202237:AAEPCaS8x4jEsUaP6BQ-8-PM-b6_PN4hk5w"
 bot = telebot.TeleBot(TOKEN)
 
 def check_2d_name(input_text):
