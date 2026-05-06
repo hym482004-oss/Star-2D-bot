@@ -5,12 +5,11 @@ def calculate_2d_ledger(input_text):
     lines = input_text.strip().split('\n')
     total_sales = 0
     
-    # --- ၁။ 2D Name & Percent Setup ---
+    # --- ၁။ 2D Name & Percent Setup (အကြီးအသေးမရွေး စစ်ဆေးခြင်း) ---
     lower_text = input_text.lower()
     percent = 0
     two_d_name = ""
     
-    # 2D Name ရှာဖွေခြင်း
     if "mm" in lower_text:
         two_d_name, percent = "MM", 10
     elif any(x in lower_text for x in ["mega", "မီဂါ"]):
@@ -20,17 +19,18 @@ def calculate_2d_ledger(input_text):
     elif "me" in lower_text:
         two_d_name, percent = "Me", 7
     
-    # 2D Name မပါရင် စာရင်းမတွက်ဘဲ Admin ခေါ်ရန်
+    # 2D Name လုံးဝမတွေ့မှသာ Admin ခေါ်မည်
     if not two_d_name:
-        return "📢 @admin @owner \n⚠️ 2D Name (Mega, Du, MM, Me) မပါရှိသဖြင့် စစ်ပေးပါရှင့်။"
+        return "📢 @admin1 @owner \n⚠️ 2D Name (Mega, Du, MM, Me) မပါရှိသဖြင့် စစ်ပေးပါရှင့်။"
 
     # --- ၂။ တစ်ကြောင်းချင်းစီကို စတင်တွက်ချက်ခြင်း ---
     for line in lines:
         line = line.strip().lower()
         
         # နာမည်ပါတဲ့လိုင်း သို့မဟုတ် blank line ကို ကျော်မည်
-        if not line or any(x in line for x in ["mega", "mm", "du", "me", "မီဂါ"]):
-            continue
+        if not line or any(x == two_d_name.lower() or x in line for x in ["mega", "mm", "du", "me", "မီဂါ"]):
+            if len(line) < 5: # "Mm", "Me" ကဲ့သို့သော နာမည်သီးသန့်လိုင်းများကို ကျော်ရန်
+                continue
 
         # (A) Special Keywords (ညီကို=20, အပူး/နက္ခတ်/ပါဝါ=10)
         special_map = {"အပူး": 10, "နက္ခတ်": 10, "ပါဝါ": 10, "ညီကို": 20}
@@ -44,7 +44,7 @@ def calculate_2d_ledger(input_text):
                     break
         if found_sp: continue
 
-        # (B) n x n Logic (အပီးအပူးပါ / အပြီးအပူးပါ / အပီးပူးပါ)
+        # (B) n x n Logic (အပီးအပူးပါ)
         if any(x in line for x in ["အပီးအပူးပါ", "အပြီးအပူးပါ", "အပီးပူးပါ"]):
             parts = re.split(r'အပီး|အပြီး', line)
             nums = re.findall(r'\d', parts[0])
@@ -54,11 +54,11 @@ def calculate_2d_ledger(input_text):
                 total_sales += (n * n) * int(price_match[0])
             continue
 
-        # (C) ပုံမှန် R နှင့် ဒဲ့ (50/30=100r50 ကဲ့သို့သော ရှုပ်ထွေးသည့်ပုံစံများအတွက်)
-        # သင်္ကေတများကို space နှင့် အစားထိုးပြီး သန့်စင်ခြင်း
-        cleaned_line = re.sub(r'[/=\-,]', ' ', line)
+        # (C) ပုံမှန် R နှင့် ဒဲ့ (Special handling for * and other symbols)
+        # သင်္ကေတများ (*, /, =, -) ကို space ဖြင့် အစားထိုးသည်
+        cleaned_line = re.sub(r'[*\/=\-,]', ' ', line)
         
-        # စာကြောင်းအဆုံးမှ 'r' နှင့် ဈေးနှုန်းကို ရှာဖွေခြင်း
+        # စာကြောင်းအဆုံးမှ 'r' နှင့် ဈေးနှုန်းကို ရှာဖွေသည်
         main_match = re.search(r'(.+?)\s*(r)?\s*(\d+)$', cleaned_line)
         
         if main_match:
@@ -66,11 +66,10 @@ def calculate_2d_ledger(input_text):
             is_r = main_match.group(2) is not None
             price = int(main_match.group(3))
             
-            # ဂဏန်းအတွဲများကို ရှာဖွေခြင်း (ဥပမာ 50 30 100)
+            # ဂဏန်းအတွဲများကို ရှာဖွေခြင်း
             all_numbers = re.findall(r'\d+', number_part)
             count = len(all_numbers)
             
-            # R (အာ) ပါရင် ၂ ဆ၊ မပါရင် ၁ ဆ
             multiplier = 2 if is_r else 1
             total_sales += count * multiplier * price
 
@@ -78,7 +77,6 @@ def calculate_2d_ledger(input_text):
     cash_back_amount = (total_sales * percent) / 100
     net_total = total_sales - cash_back_amount
     
-    # စာရင်းချုပ် Format
     summary = (
         f"✅ 2D Name: {two_d_name}\n"
         f"━━━━━━━━━━━━━━\n"
@@ -88,6 +86,3 @@ def calculate_2d_ledger(input_text):
         f"💵 လက်ခံရမည့်ငွေ: {int(net_total):,} ကျပ်"
     )
     return summary
-
-# Example usage (Optional):
-# print(calculate_2d_ledger("12 350r250\n77/00/22=50\nMega"))
